@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    env:
+      # Test-time configuration. No real secrets: the DB is not contacted by the
+      # unit tests (mocked) or the e2e liveness/validation tests (the app boots
+      # without a database in the foundation phase).
+      NODE_ENV: test
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/past_questions_test?schema=public'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Best-effort: Prisma 7 emits a generated client consumed behind a seam
+      # (src/database/prisma-client.ts). The project type-checks, tests, and
+      # builds WITHOUT a generated client, so a failure here (no driver adapter
+      # or database available in CI) must not fail the pipeline.
+      - name: Generate Prisma client (best-effort)
+        run: npm run prisma:generate
+        continue-on-error: true
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: E2E tests
+        run: npm run test:e2e
+
+      - name: Build
+        run: npm run build

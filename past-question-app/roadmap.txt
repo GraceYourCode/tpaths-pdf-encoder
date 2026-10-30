@@ -1,0 +1,1263 @@
+For the **full MVP**, with payment handled on the website and the mobile app primarily serving as a secure reader for purchased past questions, I would structure the project into these major groups.
+
+The key flow is:
+
+**Web purchase → token generated → student registers/logs in with token → token verified by backend → purchased materials appear → student downloads encrypted content → reads offline in secure reader.**
+
+---
+
+# 1. Mobile App — Student Features
+
+### A. Onboarding
+
+* Splash screen
+* App logo/branding
+* App introduction
+* Basic onboarding slides
+* Check app version
+* Check internet connection
+* Check authentication state
+
+### B. Registration
+
+Student enters:
+
+* Token ID
+* Email
+* Password
+* Name
+* Phone number — optional
+
+Backend verifies:
+
+```text
+Token exists?
+        ↓
+Token belongs to a valid purchase?
+        ↓
+Token already activated?
+        ↓
+Token still valid?
+        ↓
+YES → Create account
+```
+
+### C. Login
+
+* Email/token ID + password
+* Remember session
+* Logout
+* Session restoration
+* Forgot password
+* Password reset
+
+### D. Student Home
+
+Display:
+
+* Purchased past questions
+* Recently opened
+* Continue reading
+* Downloaded/offline materials
+* Download status
+* Profile
+
+---
+
+# 2. Library / Purchased Materials
+
+This is one of the main features.
+
+### Library
+
+```text
+My Library
+
+Mathematics 100
+Physics 100
+Chemistry 100
+Mathematics 200
+```
+
+Each material has:
+
+* Cover image
+* Title
+* Description
+* Course
+* Level
+* University/exam
+* Number of pages
+* File size
+* Purchase status
+* Download status
+* Offline availability
+
+### Actions
+
+* Open
+* Download
+* Delete local copy
+* Continue reading
+* Search
+* Bookmark
+
+---
+
+# 3. Secure PDF Reader
+
+This is the core of the application.
+
+### Reader
+
+* PDF rendering
+* Page navigation
+* Next/previous page
+* Page number
+* Jump to page
+* Zoom
+* Pinch-to-zoom
+* Fit width
+* Fit page
+* Landscape mode
+* Full-screen reading
+
+### Reader controls
+
+* Table of contents if available
+* Search within document
+* Bookmarks
+* Reading position
+* Recently viewed page
+
+### Security
+
+* No normal PDF download
+* No "Open with..." option
+* No sharing PDF
+* No exporting PDF
+* No printing
+* No copy/export functionality where technically possible
+* Screenshot protection
+* Screen-recording protection
+* Screen-mirroring protection where technically possible
+* App-switcher privacy protection
+* Dynamic watermark
+
+Example:
+
+```text
+Licensed to:
+Enoch Balogun
+License: PQ-839201
+```
+
+The watermark should be difficult to remove and ideally appear on the rendered content rather than being part of the original PDF.
+
+---
+
+# 4. Offline System
+
+This is another major module.
+
+### Initial download
+
+```text
+Internet
+   ↓
+Authenticate
+   ↓
+Verify license
+   ↓
+Download encrypted document
+   ↓
+Store securely
+   ↓
+Mark "Available Offline"
+```
+
+### Offline reading
+
+```text
+No Internet
+    ↓
+Open app
+    ↓
+Local authentication/session
+    ↓
+Validate local license
+    ↓
+Retrieve encrypted document
+    ↓
+Decrypt/render
+    ↓
+Read
+```
+
+### Offline features
+
+* Open downloaded materials
+* Continue from previous page
+* Bookmarks
+* Search
+* Reading progress
+* Notes if included in MVP
+* Local license verification
+
+### Important
+
+The locally stored file should **not be a normal `.pdf` sitting in the user's accessible storage**.
+
+It should be encrypted.
+
+---
+
+# 5. Token / License System
+
+This is the bridge between the website purchase and mobile application.
+
+### Token
+
+Example:
+
+```text
+PQ-7F82-K91L-X82P
+```
+
+The token should be:
+
+* Unique
+* Random
+* Hard to guess
+* Associated with a product
+* Associated with a purchase
+* Activatable once or according to your rules
+* Revocable
+
+### Backend license
+
+Something like:
+
+```text
+License
+├── id
+├── tokenHash
+├── userId
+├── productId
+├── purchaseId
+├── deviceId
+├── status
+├── activatedAt
+├── expiresAt
+└── createdAt
+```
+
+### License states
+
+```text
+UNUSED
+ACTIVE
+SUSPENDED
+REVOKED
+EXPIRED
+```
+
+---
+
+# 6. Device Binding
+
+You don't want:
+
+```text
+Student buys token
+        ↓
+Sends token to 20 friends
+        ↓
+20 people access the PDF
+```
+
+So:
+
+```text
+Token
+ ↓
+Account
+ ↓
+Authorized Device
+```
+
+Possible MVP rule:
+
+**One token/account = one device.**
+
+Or, more user-friendly:
+
+**One account = maximum two devices.**
+
+Features:
+
+* Register device
+* Device identification
+* Device authorization
+* Device removal
+* Device replacement
+* Maximum-device limit
+* Revoke device
+* Detect suspicious activation
+
+---
+
+# 7. Authentication & Security
+
+### Authentication
+
+* Registration
+* Login
+* Logout
+* Refresh tokens
+* Access tokens
+* Password hashing
+* Forgot password
+* Reset password
+* Email verification
+
+### Security
+
+* HTTPS
+* JWT/access tokens
+* Refresh tokens
+* Secure token storage
+* iOS Keychain
+* Android Keystore
+* API authorization
+* Rate limiting
+* Brute-force protection
+* Input validation
+* Request validation
+* Secure headers
+* CORS configuration
+* Audit logging
+
+---
+
+# 8. Backend API
+
+Your backend will be the brain of the system.
+
+I'd structure the modules approximately as:
+
+```text
+Backend
+│
+├── Auth
+├── Users
+├── Tokens
+├── Licenses
+├── Devices
+├── Products
+├── Documents
+├── Library
+├── Downloads
+├── Reading Progress
+├── Bookmarks
+├── Security
+├── Notifications
+└── Admin
+```
+
+---
+
+# 9. User Module
+
+Handles:
+
+* Create account
+* Login
+* Profile
+* Update profile
+* Password change
+* Password reset
+* Account status
+* Account deletion
+* Device management
+
+---
+
+# 10. Product Module
+
+A product represents something being sold.
+
+Example:
+
+```text
+Mathematics 100 Past Questions
+2018–2025
+```
+
+Product fields:
+
+```text
+id
+title
+description
+category
+subject
+level
+institution
+coverImage
+documentId
+version
+status
+createdAt
+updatedAt
+```
+
+---
+
+# 11. Document Module
+
+Responsible for the actual PDF content.
+
+Features:
+
+* Upload PDF
+* Validate PDF
+* Encrypt PDF
+* Store encrypted PDF
+* Document versioning
+* File metadata
+* File integrity verification
+* Document replacement
+* Document deletion
+* Document status
+
+The original document should live in **private object storage**, not a public URL.
+
+---
+
+# 12. Storage Module
+
+You'll need object storage for:
+
+* Encrypted PDFs
+* Cover images
+* Possibly thumbnails
+
+Possible providers:
+
+* Amazon S3
+* Cloudflare R2
+* Google Cloud Storage
+
+For MVP, I would use **Cloudflare R2 or S3**.
+
+---
+
+# 13. Download / Content Delivery Module
+
+The app needs to retrieve purchased documents.
+
+Flow:
+
+```text
+Mobile
+ ↓
+GET /documents/:id/access
+ ↓
+Backend
+ ↓
+Authenticate
+ ↓
+Check license
+ ↓
+Check device
+ ↓
+Generate authorized access
+ ↓
+Encrypted content
+ ↓
+Mobile
+```
+
+Features:
+
+* Authorized download
+* Resume interrupted download
+* Download progress
+* Retry
+* Integrity check
+* Encrypted local storage
+* Delete local document
+
+---
+
+# 14. Reading Progress Module
+
+The app should remember:
+
+```text
+Mathematics 100
+Last page: 87
+Progress: 47%
+```
+
+Store:
+
+* Current page
+* Last opened timestamp
+* Reading progress
+* Completed status
+
+For offline usage, progress can first be stored locally and synchronized when internet returns.
+
+---
+
+# 15. Bookmark Module
+
+Students should be able to bookmark important questions/pages.
+
+Example:
+
+```text
+Bookmarks
+
+Mathematics 100
+Page 42
+Page 87
+Page 124
+```
+
+For MVP, bookmarks can be:
+
+```text
+documentId
+pageNumber
+createdAt
+```
+
+---
+
+# 16. Search Module
+
+Two different searches:
+
+### Library search
+
+```text
+Mathematics
+Physics
+Chemistry
+```
+
+### PDF search
+
+Search inside the actual document:
+
+```text
+quadratic equation
+```
+
+The second one depends heavily on the PDF rendering/search technology you choose.
+
+---
+
+# 17. Admin Dashboard
+
+I strongly recommend building the admin dashboard alongside the mobile app.
+
+The client needs to manage everything without touching the database.
+
+### Admin authentication
+
+* Admin login
+* Admin roles
+* Admin logout
+* Password reset
+* Session management
+
+---
+
+# 18. Admin Product Management
+
+Admin can:
+
+* Create product
+* Edit product
+* Delete product
+* Publish/unpublish product
+* Set title
+* Set description
+* Set category
+* Set subject
+* Set level
+* Set institution
+* Upload cover image
+* Upload PDF
+* Replace PDF
+* View product statistics
+
+---
+
+# 19. Admin Token Management
+
+This is particularly important because payment occurs on the website.
+
+The website/payment system needs to generate tokens.
+
+Admin should be able to:
+
+```text
+Generate token
+View token
+Search token
+Activate token
+Deactivate token
+Revoke token
+View token owner
+View associated product
+View activation date
+View device
+```
+
+Example:
+
+```text
+TOKEN           PRODUCT        STATUS
+PQ82-91KD      Maths 100      ACTIVE
+PQ73-82LM      Physics 200    UNUSED
+PQ91-72KA      Chemistry 100  REVOKED
+```
+
+---
+
+# 20. Web Purchase Integration
+
+Since you specifically said **payment happens on the web**, the mobile app doesn't need payment functionality in MVP.
+
+Your architecture becomes:
+
+```text
+                 WEBSITE
+
+Student
+   ↓
+Select Past Question
+   ↓
+Pay
+   ↓
+Payment Provider
+   ↓
+Payment Verified
+   ↓
+Generate Token
+   ↓
+Send Token
+```
+
+Then:
+
+```text
+                 MOBILE APP
+
+Student
+   ↓
+Enter Token
+   ↓
+Backend
+   ↓
+Verify Token
+   ↓
+Create Account
+   ↓
+Attach License
+   ↓
+Show Purchased Materials
+```
+
+This is significantly simpler than implementing Apple/Google in-app purchases for V1.
+
+---
+
+# 21. Payment Backend Integration
+
+Even though payment isn't inside the mobile app, your backend still needs to support the website.
+
+For example:
+
+```text
+POST /payments/webhook
+```
+
+Payment provider sends:
+
+```text
+Payment successful
+```
+
+Backend:
+
+```text
+Verify payment
+      ↓
+Create purchase
+      ↓
+Create license/token
+      ↓
+Associate product
+      ↓
+Send token to customer
+```
+
+Your payment provider could be Paystack, Flutterwave, Stripe, etc., depending on the client's web setup.
+
+---
+
+# 22. Notification System
+
+For MVP, keep it simple.
+
+Potential notifications:
+
+* Account created
+* Token activated
+* New material available
+* Document updated
+* Security warning
+* Account/device change
+
+Later:
+
+* Push notifications
+* Firebase Cloud Messaging
+* Apple Push Notification Service
+
+---
+
+# 23. Security / Anti-Piracy Module
+
+This deserves its own backend module.
+
+### Application-side
+
+* Screenshot blocking/detection
+* Screen-recording detection
+* Secure screen
+* Prevent document sharing
+* Prevent printing
+* Prevent external opening
+* Encrypted local documents
+* Secure storage
+* Device binding
+* Watermarking
+
+### Backend-side
+
+* License verification
+* Device verification
+* Token verification
+* Suspicious login detection
+* Rate limiting
+* License revocation
+* Device revocation
+* Audit logs
+* Download monitoring
+
+---
+
+# 24. Analytics
+
+For MVP, track the important events.
+
+```text
+User registered
+User logged in
+Token activated
+Device registered
+Document downloaded
+Document opened
+Document opened offline
+Page viewed
+Bookmark created
+License rejected
+Device rejected
+```
+
+Admin dashboard can eventually show:
+
+```text
+Total students
+Active students
+Total purchases
+Total active licenses
+Most viewed material
+Most downloaded material
+Daily active users
+```
+
+---
+
+# 25. Error Handling
+
+You need proper error handling from the beginning.
+
+Mobile:
+
+```text
+No internet
+Invalid token
+Expired token
+License revoked
+Device not authorized
+Download failed
+Document corrupted
+Session expired
+Server unavailable
+```
+
+Backend:
+
+* Global error handler
+* Structured errors
+* HTTP status codes
+* Validation errors
+* Authentication errors
+* Authorization errors
+* Database errors
+* Storage errors
+* Payment errors
+
+---
+
+# 26. Logging & Monitoring
+
+Backend:
+
+* Pino
+* Structured logs
+* Request IDs
+* Error logs
+* Authentication logs
+* License logs
+* Download logs
+
+Production:
+
+* Sentry
+* Server monitoring
+* Database monitoring
+* Storage monitoring
+* API monitoring
+
+Mobile:
+
+* Crash reporting
+* Error reporting
+* Performance monitoring
+
+---
+
+# 27. Database
+
+For your stack, I'd use:
+
+**PostgreSQL + Prisma**
+
+Core tables:
+
+```text
+users
+products
+documents
+purchases
+licenses
+tokens
+devices
+reading_progress
+bookmarks
+download_records
+audit_logs
+admin_users
+```
+
+Potentially:
+
+```text
+document_versions
+notifications
+security_events
+```
+
+---
+
+# 28. Mobile App Screens
+
+Your MVP could have roughly:
+
+### Public
+
+1. Splash
+2. Onboarding
+3. Login
+4. Register/Activate Token
+5. Forgot Password
+6. Reset Password
+
+### Authenticated
+
+7. Home
+8. My Library
+9. Product Details
+10. Download Screen
+11. PDF Reader
+12. Bookmarks
+13. Search
+14. Profile
+15. Device Management
+16. Settings
+
+### System states
+
+17. Offline Mode
+18. No Internet
+19. Invalid License
+20. Session Expired
+21. Download Failed
+22. Server Error
+
+---
+
+# 29. Admin Dashboard Screens
+
+### Authentication
+
+1. Admin Login
+
+### Dashboard
+
+2. Overview
+
+### Products
+
+3. Products
+4. Create Product
+5. Edit Product
+6. Product Details
+
+### Documents
+
+7. Upload Document
+8. Document Management
+9. Document Versions
+
+### Licenses
+
+10. Tokens
+11. License Details
+12. Revoke License
+13. Device Management
+
+### Users
+
+14. Students
+15. Student Details
+
+### Analytics
+
+16. Analytics
+
+### Security
+
+17. Security Events
+18. Audit Logs
+
+---
+
+# 30. Infrastructure / Services
+
+Your MVP will need these external services:
+
+```text
+                    SERVICES
+
+┌─────────────────────────────────────┐
+│ Mobile                              │
+│ React Native + Expo + EAS           │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ Backend                             │
+│ Node.js + TypeScript                │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ Database                            │
+│ PostgreSQL + Prisma                 │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ File Storage                        │
+│ S3 / Cloudflare R2                  │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ Web                                 │
+│ Next.js                             │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ Payment                             │
+│ Paystack / Flutterwave / Stripe     │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ Email                               │
+│ Resend                              │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ Monitoring                          │
+│ Sentry                              │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ Deployment                          │
+│ EAS + Vercel/Cloud infrastructure   │
+└─────────────────────────────────────┘
+```
+
+---
+
+# 31. Development Phases
+
+I would **not** build all of these simultaneously.
+
+### Phase 1 — Foundation
+
+* Expo
+* React Native
+* TypeScript
+* Expo Router
+* EAS
+* Project architecture
+* Environment configuration
+* Git/GitHub
+* CI/CD
+
+### Phase 2 — Backend
+
+* Node.js
+* TypeScript
+* PostgreSQL
+* Prisma
+* Authentication
+* Users
+* Products
+* Tokens
+* Licenses
+* Devices
+
+### Phase 3 — Admin
+
+* Admin authentication
+* Product management
+* PDF upload
+* Token management
+* Student management
+
+### Phase 4 — Mobile
+
+* Onboarding
+* Registration
+* Token activation
+* Login
+* Home
+* Library
+* Product details
+
+### Phase 5 — Document System
+
+* Private storage
+* PDF encryption
+* Authorized access
+* Download manager
+* Secure local storage
+
+### Phase 6 — Secure Reader
+
+* PDF rendering
+* Navigation
+* Zoom
+* Search
+* Bookmarks
+* Reading progress
+* Watermark
+
+### Phase 7 — Offline
+
+* Offline library
+* Local license
+* Offline reader
+* Local progress
+* Sync when online
+
+### Phase 8 — Security
+
+* Screenshot protection
+* Screen recording protection
+* Device binding
+* Root/jailbreak considerations
+* App integrity
+* License revocation
+* Security events
+
+### Phase 9 — Production
+
+* Error handling
+* Logging
+* Sentry
+* Performance testing
+* Security testing
+* API testing
+* Device testing
+
+### Phase 10 — Deployment
+
+* Android production build
+* iOS production build
+* App icons
+* Splash screen
+* Privacy policy
+* Terms
+* App Store metadata
+* Google Play metadata
+* Screenshots
+* Store submission
+
+---
+
+# 32. What I would consider the actual MVP
+
+Don't let the MVP become 50 features.
+
+The **minimum production MVP** should be:
+
+### Student
+
+* Register with token
+* Login
+* View purchased materials
+* Download purchased material
+* Secure PDF reader
+* Offline reading
+* Reading progress
+* Basic bookmarks
+* Screenshot/screen-recording protection
+* Watermark
+* Device binding
+* Logout
+
+### Backend
+
+* Authentication
+* Token management
+* License management
+* Product management
+* Document management
+* Device management
+* Secure document delivery
+* Encrypted storage
+* Offline license verification
+* Audit logs
+
+### Admin
+
+* Admin login
+* Add/edit products
+* Upload PDFs
+* Generate/manage tokens
+* View students
+* View purchases/licenses
+* Revoke licenses
+* View basic analytics
+
+### Website
+
+* Product catalogue
+* Product purchase
+* Payment verification
+* Token generation
+* Token delivery
+
+That is the **real MVP**.
+
+Everything else—advanced notes, highlights, AI explanations, practice tests, leaderboards, social features, sophisticated analytics, etc.—should come later.
+
+---
+
+## The whole system in one picture
+
+```text
+                    ┌───────────────────┐
+                    │     WEBSITE       │
+                    │                   │
+                    │ Products          │
+                    │ Checkout          │
+                    │ Payment           │
+                    └─────────┬─────────┘
+                              │
+                         Payment
+                              │
+                              ▼
+                    ┌───────────────────┐
+                    │     BACKEND       │
+                    │                   │
+                    │ Auth              │
+                    │ Users             │
+                    │ Products          │
+                    │ Purchases         │
+                    │ Tokens            │
+                    │ Licenses          │
+                    │ Devices           │
+                    │ Security          │
+                    └───────┬─────┬─────┘
+                            │     │
+                   ┌────────┘     └─────────┐
+                   ▼                        ▼
+          ┌─────────────────┐      ┌─────────────────┐
+          │   PostgreSQL    │      │ Private Storage │
+          │                 │      │                 │
+          │ Users           │      │ Encrypted PDFs  │
+          │ Licenses        │      │ Covers          │
+          │ Purchases       │      └─────────────────┘
+          │ Devices         │
+          └─────────────────┘
+                            │
+                       Token/License
+                            │
+                            ▼
+                    ┌───────────────────┐
+                    │    MOBILE APP     │
+                    │                   │
+                    │ Register          │
+                    │ Login             │
+                    │ Library           │
+                    │ Downloads         │
+                    │ Secure Reader     │
+                    │ Offline Mode      │
+                    │ Bookmarks         │
+                    │ Progress          │
+                    └─────────┬─────────┘
+                              │
+                    ┌─────────▼─────────┐
+                    │ SECURITY LAYER    │
+                    │                   │
+                    │ Encryption        │
+                    │ Device Binding    │
+                    │ Watermark         │
+                    │ Screenshot Block  │
+                    │ Screen Capture    │
+                    │ License Check     │
+                    └───────────────────┘
+```
+
+This gives you a **complete V1 product architecture** without unnecessarily adding mobile payments. The next logical step is to turn this into a **technical implementation plan**: exact repositories, folder structures, database schema, API endpoints, packages/libraries, environment variables, and the order of Claude Code prompts you'll use to build each module.

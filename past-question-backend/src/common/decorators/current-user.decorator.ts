@@ -1,0 +1,1 @@
+import { createParamDecorator, ExecutionContext } from '@nestjs/common'; import type { AuthRequest } from '../guards/auth.guard.js'; export const CurrentUser=createParamDecorator((_d,ctx:ExecutionContext)=>ctx.switchToHttp().getRequest<AuthRequest>().user);

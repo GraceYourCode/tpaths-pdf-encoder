@@ -1,0 +1,1 @@
+import { Module } from '@nestjs/common'; import { DocumentsService } from './documents.service.js'; import { AdminProductDocumentsController,AdminDocumentsController } from './documents.controller.js'; @Module({controllers:[AdminProductDocumentsController,AdminDocumentsController],providers:[DocumentsService],exports:[DocumentsService]}) export class DocumentsModule{}

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "whatsapp" TEXT NOT NULL DEFAULT '+2347089234130';

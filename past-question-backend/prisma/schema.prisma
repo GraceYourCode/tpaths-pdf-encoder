@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  SUPER_ADMIN
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum DocumentStatus {
+  PROCESSING
+  READY
+  DISABLED
+  DELETED
+  FAILED
+}
+
+enum PurchaseStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum LicenseStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+}
+
+enum TokenStatus {
+  UNUSED
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+}
+
+enum DeviceStatus {
+  ACTIVE
+  REVOKED
+}
+
+model User {
+  id                  String                   @id @default(uuid())
+  email               String                   @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  whatsapp            String
+  role                Role                     @default(STUDENT)
+  status              UserStatus               @default(PENDING)
+  emailVerifiedAt     DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  sessions            Session[]
+  devices             Device[]
+  purchases           Purchase[]
+  licenses            License[]
+  auditLogs           AuditLog[]
+  verificationTokens  EmailVerificationToken[]
+  passwordResetTokens PasswordResetToken[]
+  createdProducts     Product[]                @relation("ProductCreator")
+}
+
+model Product {
+  id               String            @id @default(uuid())
+  title            String
+  description      String?
+  price            Int               @default(0)
+  currency         String            @default("NGN")
+  category         String?
+  subject          String?
+  course           String?
+  level            String?
+  institution      String?
+  examType         String?
+  status           ProductStatus     @default(DRAFT)
+  coverImageKey    String?
+  createdById      String?
+  createdBy        User?             @relation("ProductCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  documents        Document[]
+  purchases        Purchase[]
+  licenses         License[]
+  activationTokens ActivationToken[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([status])
+  @@index([subject])
+  @@index([institution])
+}
+
+model Document {
+  id                      String         @id @default(uuid())
+  productId               String
+  product                 Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  title                   String
+  version                 Int            @default(1)
+  storageKey              String
+  mimeType                String
+  sizeBytes               Int
+  checksumSha256          String
+  encryptedSizeBytes      Int?
+  encryptedChecksumSha256 String?
+  encryptionKeyVersion    String?
+  status                  DocumentStatus @default(PROCESSING)
+  failureReason           String?
+  processedAt             DateTime?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  @@unique([productId, version])
+  @@index([productId, status])
+  @@index([status, updatedAt])
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  provider    String
+  reference   String        @unique
+  eventId     String?       @unique
+  amount      Int
+  currency    String
+  status      PaymentStatus @default(PENDING)
+  rawMetadata Json?
+  verifiedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  purchase    Purchase?
+
+  @@index([provider, status])
+}
+
+model Purchase {
+  id        String         @id @default(uuid())
+  userId    String
+  productId String
+  paymentId String         @unique
+  reference String         @unique
+  status    PurchaseStatus @default(PENDING)
+  amount    Int
+  currency  String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  payment   Payment        @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  license   License?
+
+  @@index([userId, createdAt])
+  @@index([productId, createdAt])
+}
+
+model License {
+  id              String        @id @default(uuid())
+  userId          String
+  productId       String
+  purchaseId      String        @unique
+  status          LicenseStatus @default(ACTIVE)
+  deviceId        String?
+  expiresAt       DateTime?
+  activatedAt     DateTime?
+  lastValidatedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  purchase        Purchase      @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+
+  @@index([userId, status])
+  @@index([productId, status])
+  @@index([deviceId, status])
+}
+
+model ActivationToken {
+  id          String      @id @default(uuid())
+  tokenHash   String      @unique
+  productId   String
+  purchaseId  String?     @unique
+  status      TokenStatus @default(UNUSED)
+  expiresAt   DateTime?
+  activatedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([productId, status])
+  @@index([expiresAt])
+}
+
+model Device {
+  id         String       @id @default(uuid())
+  userId     String
+  deviceHash String
+  publicKey  String?
+  platform   String
+  appVersion String?
+  status     DeviceStatus @default(ACTIVE)
+  lastSeenAt DateTime     @default(now())
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceHash])
+  @@index([userId, status])
+}
+
+model Session {
+  id               String    @id @default(uuid())
+  userId           String
+  tokenFamilyId    String
+  refreshTokenHash String    @unique
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([tokenFamilyId])
+  @@index([expiresAt])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  entityType String?
+  entityId   String?
+  ipAddress  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+}

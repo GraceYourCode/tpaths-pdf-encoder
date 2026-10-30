@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+const root=path.resolve(import.meta.dirname,'..');
+const text=fs.readFileSync(path.join(root,'src/security/document.ts'),'utf8');
+const secure=fs.readFileSync(path.join(root,'src/storage/secure.ts'),'utf8');
+const api=fs.readFileSync(path.join(root,'src/api/index.ts'),'utf8');
+test('document crypto uses PQENC01, RSAOAEP256 and AES-GCM',()=>{assert.match(text,/PQENC01/);assert.match(text,/RSAOAEP256/);assert.match(text,/AESSealedData/)});
+test('secure storage is used for session and device private key',()=>{assert.match(secure,/expo-secure-store/);assert.match(secure,/tpaths.privateKey/);assert.doesNotMatch(secure,/AsyncStorage/) });
+test('content access is backend-authorized',()=>{assert.match(api,/content=\{authorize/);assert.match(api,/content=\{authorize:[\s\S]*artifact/) });
+test('client source contains no obvious server secret configuration',()=>{const all=fs.readFileSync(path.join(root,'src/config.ts'),'utf8');assert.doesNotMatch(all,/DATABASE_URL|JWT_ACCESS_SECRET|CONTENT_ENCRYPTION_KEY|AWS_SECRET_ACCESS_KEY/)});

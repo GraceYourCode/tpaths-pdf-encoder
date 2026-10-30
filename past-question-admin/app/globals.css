@@ -1,0 +1,146 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,500;0,600;0,700;1,600;1,700&display=swap");
+@import "tailwindcss";
+
+/*
+ * TPaths Admin design tokens.
+ *
+ * BRANDING: colours and type are derived from the TPaths brand website
+ * (supplied as reference images) — a vivid violet primary, deep royal-purple
+ * brand surfaces, a near-black purple sidebar, violet-tinted neutrals on white,
+ * and generous whitespace. Display/brand type is a serif (Lora); UI/body type
+ * is a clean sans (Inter), both wired in app/layout.tsx.
+ *
+ * Status colours (success/warning/danger) stay conventional green/amber/red for
+ * legibility — those signal state, not brand.
+ *
+ * To retune the brand, edit the CSS variables in this file only; every component
+ * consumes them via Tailwind tokens (bg-primary, text-muted-foreground,
+ * border-border, bg-sidebar, font-serif, …). bawearn ppoo
+ */
+
+:root {
+  --background: #fbfafd;
+  --foreground: #1b1630;
+
+  --card: #ffffff;
+  --card-foreground: #1b1630;
+
+  --muted: #f3f1f9;
+  --muted-foreground: #6b6480;
+
+  --border: #e9e5f2;
+  --input: #ded8ec;
+  --ring: #8b5cf6;
+
+  /* Interactive violet — buttons, links, active states. */
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+  --primary-hover: #6d28d9;
+
+  /* Deep royal-purple brand surface (hero/section blocks). */
+  --brand: #4c1d95;
+  --brand-foreground: #f5f3ff;
+
+  --accent: #f3eefe;
+  --accent-foreground: #5b21b6;
+
+  /* Near-black purple chrome, echoing the brand footer. */
+  --sidebar: #1a0b2e;
+  --sidebar-foreground: #cbbfe0;
+  --sidebar-muted: #9385ad;
+  --sidebar-accent: #2a1745;
+  --sidebar-active: #7c3aed;
+  --sidebar-active-foreground: #ffffff;
+
+  --success: #15803d;
+  --success-bg: #dcfce7;
+  --warning: #b45309;
+  --warning-bg: #fef3c7;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --danger-foreground: #fef2f2;
+
+  --font-sans:
+    "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-serif: "Lora", Georgia, Cambria, "Times New Roman", serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-active-foreground: var(--sidebar-active-foreground);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-foreground: var(--danger-foreground);
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  outline: none;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * Subtle graph-paper grid — a quiet nod to the brand's background motif. Kept
+ * very faint so it reads as texture, never clutter. Apply with `bg-brand-grid`.
+ */
+.bg-brand-grid {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--brand) 5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--brand) 5%, transparent) 1px,
+      transparent 1px
+    ),
+    url("/auth-bg2.jpg");
+  opacity: 0.6;
+  filter: brightness(1.2);
+}
+
+.logo {
+  font-family: var(--font-carter-one);
+  font-weight: 400;
+  font-size: 1rem;
+  line-height: 1.75;
+  letter-spacing: 0.00938em;
+}
