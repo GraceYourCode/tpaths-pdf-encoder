@@ -21,7 +21,7 @@ class DocumentDto {
 @Controller('admin/products/:productId/documents')
 @Roles('ADMIN', 'SUPER_ADMIN')
 export class AdminProductDocumentsController {
-  constructor(private readonly s: DocumentsService) {}
+  constructor(private readonly documentService: DocumentsService) {}
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
@@ -35,27 +35,27 @@ export class AdminProductDocumentsController {
     @Body() d: DocumentDto,
     @CurrentUser() u: any,
   ) {
-    return this.s.create(productId, file, d, u.id);
+    return this.documentService.create(productId, file, d, u.id);
   }
   @Get() list(@Param('productId') productId: string) {
-    return this.s.list(productId, true);
+    return this.documentService.list(productId, true);
   }
 }
 @Controller('admin/documents')
 @Roles('ADMIN', 'SUPER_ADMIN')
 export class AdminDocumentsController {
-  constructor(private readonly s: DocumentsService) {}
+  constructor(private readonly documentService: DocumentsService) {}
   @Get(':id') get(@Param('id') id: string) {
-    return this.s.get(id, true);
+    return this.documentService.get(id, true);
   }
   @Patch(':id') update(
     @Param('id') id: string,
     @Body() d: DocumentDto,
     @CurrentUser() u: any,
   ) {
-    return this.s.update(id, d, u.id);
+    return this.documentService.update(id, d, u.id);
   }
   @Delete(':id') remove(@Param('id') id: string, @CurrentUser() u: any) {
-    return this.s.remove(id, u.id);
+    return this.documentService.remove(id, u.id);
   }
 }

@@ -14,6 +14,7 @@ export class DocumentsService {
     private readonly storage: StorageService,
     private readonly audit: AuditService,
   ) {}
+  
   async create(productId: string, file: any, d: any, adminId: string) {
     if (!file || file.mimetype !== 'application/pdf')
       throw new BadRequestException('Only PDF files are allowed');
@@ -37,7 +38,7 @@ export class DocumentsService {
         mimeType: 'application/pdf',
         sizeBytes: file.size,
         checksumSha256: stored.checksumSha256,
-        status: d.status || 'ACTIVE',
+        status: DocumentStatus.PROCESSING,
       },
     });
     await this.audit.log({
@@ -51,7 +52,7 @@ export class DocumentsService {
   }
   async list(productId: string, admin = false) {
     return (this.prisma as any).document.findMany({
-      where: { productId, ...(!admin ? { status: 'ACTIVE' } : {}) },
+      where: { productId, ...(!admin ? { status: DocumentStatus.READY } : {}) },
       select: {
         id: true,
         title: true,
@@ -93,7 +94,7 @@ export class DocumentsService {
     await this.get(id, true);
     await (this.prisma as any).document.update({
       where: { id },
-      data: { status: 'ARCHIVED' },
+      data: { status: DocumentStatus.DISABLED },
     });
     await this.audit.log({
       userId: adminId,

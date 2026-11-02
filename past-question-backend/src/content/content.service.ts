@@ -7,7 +7,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { encryptPdfToArtifact, randomToken, signJwt, verifyJwt } from '../common/utils/crypto.js';
+import {
+  encryptPdfToArtifact,
+  randomToken,
+  signJwt,
+  verifyJwt,
+} from '../common/utils/crypto.js';
 import { StorageService } from '../storage/storage.service.js';
 import { DocumentStatus } from '../generated/prisma/enums.js';
 
@@ -42,7 +47,7 @@ export class ContentService {
     });
     if (
       !l ||
-      l.product.status !== 'ACTIVE' ||
+      l.product.status !== DocumentStatus.READY ||
       (l.expiresAt && l.expiresAt <= new Date()) ||
       l.deviceId !== deviceId
     )
@@ -89,67 +94,69 @@ export class ContentService {
     };
   }
 
-  async stream(documentId: string, token: string) {
-    let p: any;
+  async getAuthorizedArtifact(documentId: string, contentToken: string) {
+    let payload: any;
+
     try {
-      p = verifyJwt<any>(
-        token,
+      payload = verifyJwt(
+        contentToken,
         this.config.getOrThrow('security.contentSecret'),
       );
     } catch {
-      throw new UnauthorizedException('Invalid content authorization');
+      throw new UnauthorizedException(
+        'Invalid or expired content authorization',
+      );
     }
-    if (p.doc !== documentId)
-      throw new ForbiddenException('Invalid content authorization');
-    const d = await (this.prisma as any).document.findUnique({
-      where: { id: documentId },
-    });
-    if (!d || d.status !== 'ACTIVE')
-      throw new NotFoundException('Document not found');
-    const l = await (this.prisma as any).license.findUnique({
-      where: { id: p.license },
-    });
-    if (
-      !l ||
-      l.userId !== p.sub ||
-      l.deviceId !== p.device ||
-      l.status !== 'ACTIVE' ||
-      (l.expiresAt && l.expiresAt <= new Date())
-    )
-      throw new ForbiddenException('Content access not authorized');
-    return this.storage.getPrivate(d.storageKey);
-  }
-  
-  async getAuthorizedArtifact(documentId: string, contentToken: string) {
+
+    if (payload.doc !== documentId) {
+      throw new ForbiddenException('Document authorization mismatch');
+    }
+
     const license = await this.prisma.license.findUnique({
-      where: { id: contentToken }, 
+      where: { id: payload.license },
       include: {
         product: {
-          include: { documents: true }
+          include: { documents: true },
         },
-        purchase: true
-      }
+        purchase: true,
+      },
     });
 
-    if (!license) throw new ForbiddenException('Invalid content token or license not found');
+    if (!license)
+      throw new ForbiddenException(
+        'Invalid content token or license not found',
+      );
 
-    if (license.purchase.status !== 'PAID') throw new ForbiddenException('Purchase not paid');
-    if (license.status !== 'ACTIVE') throw new ForbiddenException('License is inactive or revoked');
-    if (license.product.status !== 'ACTIVE') throw new ForbiddenException('Product is no longer available');
-    
-    if (!license.deviceId) throw new ForbiddenException('License is not bound to a device');
+    if (license.purchase.status !== 'PAID')
+      throw new ForbiddenException('Purchase not paid');
+    if (license.status !== 'ACTIVE')
+      throw new ForbiddenException('License is inactive or revoked');
+    if (license.product.status !== 'ACTIVE')
+      throw new ForbiddenException('Product is no longer available');
 
-    const document = license.product.documents.find(doc => doc.id === documentId);
-    if (!document) throw new NotFoundException('Document not found in authorized product');
-    
-    if (document.status !== DocumentStatus.READY) throw new ForbiddenException('Document is not ready for delivery');
+    if (!license.deviceId)
+      throw new ForbiddenException('License is not bound to a device');
+
+    const document = license.product.documents.find(
+      (doc) => doc.id === documentId,
+    );
+    if (!document)
+      throw new NotFoundException('Document not found in authorized product');
+
+    if (!document || document.status !== DocumentStatus.READY)
+      throw new ForbiddenException('Document is not ready for delivery');
 
     const rawPdfBuffer = await this.storage.getPrivate(document.storageKey);
 
-    const encryptionKey = process.env.ARTIFACT_ENCRYPTION_KEY!; 
-    const artifactBuffer = encryptPdfToArtifact (rawPdfBuffer, encryptionKey, license.deviceId);
+    const encryptionKey = this.config.getOrThrow(
+    'security.artifactEncryptionKey',
+  );
+    const artifactBuffer = encryptPdfToArtifact(
+      rawPdfBuffer,
+      encryptionKey,
+      license.deviceId,
+    );
 
     return { artifactBuffer, filename: document.title.replace(/\s+/g, '_') };
   }
-
 }
