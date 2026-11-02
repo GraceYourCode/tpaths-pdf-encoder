@@ -6,6 +6,7 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { promisify } from 'node:util';
+import * as crypto from 'crypto';
 
 function scryptAsync(
   password: string,
@@ -100,4 +101,18 @@ export function verifyJwt<T extends Record<string, unknown>>(
   )
     throw new Error('expired token');
   return payload;
+}
+
+export function encryptPdfToArtifact(rawBuffer: Buffer, baseKey: string, deviceId: string): Buffer {
+  // Derive a 32-byte key using the base key and device ID for hardware-locked encryption
+  const key = crypto.pbkdf2Sync(baseKey, deviceId, 100000, 32, 'sha256');
+  const iv = crypto.randomBytes(12);
+  
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  
+  const encrypted = Buffer.concat([cipher.update(rawBuffer), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  // Artifact format: [IV (12 bytes)] + [Auth Tag (16 bytes)] + [Encrypted Data]
+  return Buffer.concat([iv, authTag, encrypted]);
 }
