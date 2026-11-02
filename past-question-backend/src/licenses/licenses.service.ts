@@ -189,10 +189,20 @@ export class LicensesService {
     return out;
   }
   
-  async generateToken(productId: string, expiresAt?: Date) {
+  async generateToken(
+    productId: string,
+    expiresAt?: Date,
+    purchaseId?: string,
+    db: any = this.prisma,
+  ) {
     const raw = `PQ-${randomToken(18).toUpperCase()}`;
-    const t = await (this.prisma as any).activationToken.create({
-      data: { tokenHash: sha256(raw), productId, expiresAt },
+    const t = await (db as any).activationToken.create({
+      data: {
+        tokenHash: sha256(raw),
+        productId,
+        expiresAt,
+        ...(purchaseId ? { purchaseId } : {}),
+      },
     });
     return { id: t.id, token: raw, expiresAt: t.expiresAt };
   }

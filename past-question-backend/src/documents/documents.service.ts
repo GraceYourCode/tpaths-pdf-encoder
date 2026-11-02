@@ -7,6 +7,8 @@ import { PrismaService } from '../database/prisma.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { DocumentStatus } from '../generated/prisma/browser.js';
+
+const MAX_PDF_UPLOAD_BYTES = 25 * 1024 * 1024;
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -18,7 +20,7 @@ export class DocumentsService {
   async create(productId: string, file: any, d: any, adminId: string) {
     if (!file || file.mimetype !== 'application/pdf')
       throw new BadRequestException('Only PDF files are allowed');
-    const max = Number(d.maxBytes || 25 * 1024 * 1024);
+    const max = MAX_PDF_UPLOAD_BYTES;
     if (file.size > max) throw new BadRequestException('File too large');
     const magic = file.buffer.subarray(0, 5).toString('ascii');
     if (magic !== '%PDF-') throw new BadRequestException('Invalid PDF file');
@@ -38,7 +40,8 @@ export class DocumentsService {
         mimeType: 'application/pdf',
         sizeBytes: file.size,
         checksumSha256: stored.checksumSha256,
-        status: DocumentStatus.PROCESSING,
+        // Upload validation (MIME, size, PDF magic) is complete at this point.
+        status: DocumentStatus.READY,
       },
     });
     await this.audit.log({
@@ -68,7 +71,7 @@ export class DocumentsService {
   }
   async get(id: string, admin = false) {
     const d = await (this.prisma as any).document.findUnique({ where: { id } });
-    if (!d || (!admin && d.status !== 'ACTIVE'))
+    if (!d || (!admin && d.status !== DocumentStatus.READY))
       throw new NotFoundException('Document not found');
     return this.public(d);
   }

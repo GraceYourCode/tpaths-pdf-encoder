@@ -17,11 +17,15 @@ The document subsystem is designed to reduce:
 
 ## Cryptography
 
-PDFs are encrypted with AES-256-GCM using a random 256-bit DEK per document. The DEK is itself encrypted (wrapped) with the configured master key. The artifact contains the cryptographic metadata required by a trusted mobile reader, but never contains the master key.
+Artifacts use the TPQE v1 format, specified in `docs/pqe-artifact-protocol.md`.
 
-The application uses Node's standard `node:crypto` primitives rather than a custom cipher.
+Each artifact has a fresh random 256-bit AES-GCM document key (DEK) and a fresh
+ephemeral P-256 key pair. The DEK is wrapped to the registered device public
+key with ECDH, HKDF-SHA256 and AES-256-GCM. The PDF is encrypted with the DEK
+using AES-256-GCM. No long-lived master key is used to encrypt artifacts, and
+the device ID is never used as a key-derivation input on its own.
 
-`CONTENT_ENCRYPTION_KEY` must be a dedicated high-entropy secret in preview/production. Production configuration rejects a missing encryption key. A production deployment should move the master key into a KMS/HSM-backed secret provider; the current environment-backed key is the explicit Phase 5 key-management seam.
+The `ARTIFACT_ENCRYPTION_KEY` setting is no longer used for artifact encryption.
 
 ## Integrity
 
@@ -68,4 +72,9 @@ A backend cannot prevent a legitimate mobile device from copying plaintext after
 
 ## Device key wrapping
 
-For mobile-ready offline decryption, device registration can include an RSA public key. The private key remains device-local. The server unwraps the per-document DEK only inside the trusted backend and wraps it to the device public key using RSA-OAEP with SHA-256. This avoids giving the mobile client the storage credential or document-encryption master key.
+Device registration accepts an optional P-256 SubjectPublicKeyInfo key
+(base64 DER). The backend validates the curve and encoding, and refuses to
+replace a registered key without revoking the device. Artifact delivery
+requires the device to have a registered key.
+
+The mobile private key must remain on the device in platform-protected storage.

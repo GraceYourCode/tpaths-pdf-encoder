@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -43,11 +44,8 @@ export class AuthService {
     const exists = await (this.prisma as any).user.findUnique({
       where: { email },
     });
-    console.log("exists", exists);
     if (exists)
-      return {
-        error: 'User with this email already exists',
-      };
+      throw new ConflictException('An account with this email already exists');
 
     const u = await (this.prisma as any).user.create({
       data: {
@@ -91,8 +89,18 @@ export class AuthService {
       });
       throw new UnauthorizedException('Invalid credentials');
     }
-    if (u.status !== 'ACTIVE' || !u.emailVerifiedAt)
-      throw new UnauthorizedException('Account is not active');
+    // Password is verified first, so account state is only revealed to the
+    // holder of the correct password.
+    if (!u.emailVerifiedAt)
+      throw new ForbiddenException({
+        code: 'EMAIL_NOT_VERIFIED',
+        message: 'Verify your email address before signing in',
+      });
+    if (u.status !== 'ACTIVE')
+      throw new ForbiddenException({
+        code: 'ACCOUNT_INACTIVE',
+        message: 'Account is not active',
+      });
     const sid = randomToken(18),
       family = randomToken(18);
     const refresh = signJwt(

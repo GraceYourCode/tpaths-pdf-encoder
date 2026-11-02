@@ -7,12 +7,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { randomToken, signJwt, verifyJwt } from '../common/utils/crypto.js';
 import {
-  encryptPdfToArtifact,
-  randomToken,
-  signJwt,
-  verifyJwt,
-} from '../common/utils/crypto.js';
+  decodeDevicePublicKeyBase64,
+  encodePqeArtifact,
+} from '../common/utils/pqe.js';
+import { randomUUID } from 'node:crypto';
 import { StorageService } from '../storage/storage.service.js';
 import { DocumentStatus } from '../generated/prisma/enums.js';
 
@@ -29,6 +29,7 @@ export class ContentService {
     userId: string,
     documentId: string,
     deviceId: string,
+    sessionId: string,
     ip?: string,
   ) {
     const d = await (this.prisma as any).document.findUnique({
@@ -62,6 +63,7 @@ export class ContentService {
         doc: documentId,
         device: deviceId,
         license: l.id,
+        sid: sessionId,
         jti: randomToken(12),
       },
       this.config.getOrThrow('security.contentSecret'),
@@ -90,7 +92,7 @@ export class ContentService {
         sizeBytes: d.sizeBytes,
         checksumSha256: d.checksumSha256,
       },
-      downloadEndpoint: `/api/v1/content/${d.id}/stream`,
+      artifactEndpoint: `/api/v1/content/${d.id}/artifact`,
     };
   }
 
@@ -137,6 +139,47 @@ export class ContentService {
     if (!license.deviceId)
       throw new ForbiddenException('License is not bound to a device');
 
+    // The signed token must agree with the current database state.
+    if (
+      payload.sub !== license.userId ||
+      payload.license !== license.id ||
+      payload.device !== license.deviceId ||
+      typeof payload.sid !== 'string'
+    ) {
+      throw new ForbiddenException('Content authorization does not match license');
+    }
+
+    // Session binding: the session that requested the token must still be live.
+    const session = await (this.prisma as any).session.findFirst({
+      where: {
+        id: payload.sid,
+        userId: license.userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+    if (!session) throw new ForbiddenException('Session is no longer active');
+    const owner = await (this.prisma as any).user.findUnique({
+      where: { id: license.userId },
+      select: { status: true },
+    });
+    if (!owner || owner.status !== 'ACTIVE')
+      throw new ForbiddenException('Account is not active');
+
+    const device = await (this.prisma as any).device.findUnique({
+      where: { id: license.deviceId },
+    });
+    if (
+      !device ||
+      device.userId !== license.userId ||
+      device.status !== 'ACTIVE'
+    ) {
+      throw new ForbiddenException('Device not authorized');
+    }
+    if (!device.publicKey) {
+      throw new ForbiddenException('Device has no registered public key');
+    }
+
     const document = license.product.documents.find(
       (doc) => doc.id === documentId,
     );
@@ -148,14 +191,13 @@ export class ContentService {
 
     const rawPdfBuffer = await this.storage.getPrivate(document.storageKey);
 
-    const encryptionKey = this.config.getOrThrow(
-    'security.artifactEncryptionKey',
-  );
-    const artifactBuffer = encryptPdfToArtifact(
-      rawPdfBuffer,
-      encryptionKey,
-      license.deviceId,
-    );
+    const artifactBuffer = encodePqeArtifact({
+      pdf: rawPdfBuffer,
+      artifactId: randomUUID(),
+      documentId: document.id,
+      deviceId: device.id,
+      devicePublicKeyDer: decodeDevicePublicKeyBase64(device.publicKey),
+    });
 
     return { artifactBuffer, filename: document.title.replace(/\s+/g, '_') };
   }

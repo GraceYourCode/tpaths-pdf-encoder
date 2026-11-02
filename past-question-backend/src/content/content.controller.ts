@@ -21,7 +21,7 @@ export class ContentController {
     @CurrentUser() u: any,
     @Req() r: AuthRequest,
   ) {
-    return this.contentService.authorize(u.id, id, d.deviceId, r.ip);
+    return this.contentService.authorize(u.id, id, d.deviceId, u.sessionId, r.ip);
   }
 
   @Public() @Get(':documentId/artifact') async stream(
@@ -36,8 +36,13 @@ export class ContentController {
 
     const { artifactBuffer, filename } = await this.contentService.getAuthorizedArtifact(id, contentToken);
 
+    const safeName = filename.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120) || 'document';
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}.pqe"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}.pqe"`);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Length', String(artifactBuffer.length));
     res.send(artifactBuffer);
   }
 }

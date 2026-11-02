@@ -21,7 +21,6 @@ export interface SecurityConfig {
   deviceHashPepper: string;
   accessExpirationSec: number;
   refreshExpirationMs: number;
-  artifactEncryptionKey: string;
 }
 export interface PaymentConfig {
   provider: string;
@@ -88,9 +87,6 @@ export default (): Configuration => {
       refreshExpirationMs: Number(
         process.env.JWT_REFRESH_EXPIRATION_MS ?? 2592000000,
       ),
-      artifactEncryptionKey:
-        process.env.ARTIFACT_ENCRYPTION_KEY ??
-        'development-artifact-encryption-key-change-me',
     },
     payment: {
       provider: process.env.PAYMENT_PROVIDER ?? 'paystack',

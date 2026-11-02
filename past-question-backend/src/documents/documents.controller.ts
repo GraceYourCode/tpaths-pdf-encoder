@@ -16,7 +16,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Roles } from '../common/decorators/auth.decorator.js';
 class DocumentDto {
   @IsString() title!: string;
-  @IsOptional() @IsIn(['DRAFT', 'ACTIVE', 'ARCHIVED']) status?: string;
+  @IsOptional() @IsIn(['READY', 'DISABLED', 'DELETED']) status?: string;
 }
 @Controller('admin/products/:productId/documents')
 @Roles('ADMIN', 'SUPER_ADMIN')
