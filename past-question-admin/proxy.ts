@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerEnv } from "@/lib/env";
+import { accessTokenNeedsRefresh } from "@/lib/jwt";
 
 const PUBLIC_PATHS = ["/login"];
 const ADMIN_COOKIE_SUFFIX = "_admin";
@@ -8,24 +9,12 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-function tokenExpiry(token: string): number | null {
-  try {
-    const part = token.split(".")[1];
-    if (!part) return null;
-    const normalized = part.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
-    const payload = JSON.parse(atob(padded)) as { exp?: unknown };
-    return typeof payload.exp === "number" ? payload.exp : null;
-  } catch { return null; }
-}
-
 async function refreshIfExpired(request: NextRequest, response: NextResponse): Promise<NextResponse | null> {
   const env = getServerEnv();
   const access = request.cookies.get(env.sessionCookieName)?.value;
   const refresh = request.cookies.get(env.refreshCookieName)?.value;
   if (!access || !refresh) return null;
-  const exp = tokenExpiry(access);
-  if (exp === null || exp > Math.floor(Date.now() / 1000)) return response;
+  if (!accessTokenNeedsRefresh(access)) return response;
 
   try {
     const backend = await fetch(`${env.apiBaseUrl}/auth/refresh`, {

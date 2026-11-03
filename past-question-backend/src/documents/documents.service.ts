@@ -30,7 +30,8 @@ export class DocumentsService {
     });
     const version = (latest?.version ?? 0) + 1;
     const key = `products/${productId}/documents/${crypto.randomUUID()}-${version}.pdf`;
-    const stored = await this.storage.putPrivate(key, file.buffer);
+    // Encrypted at rest before it reaches the object store.
+    const stored = await this.storage.putPrivateDocument(key, file.buffer);
     const doc = await (this.prisma as any).document.create({
       data: {
         productId,
@@ -40,6 +41,8 @@ export class DocumentsService {
         mimeType: 'application/pdf',
         sizeBytes: file.size,
         checksumSha256: stored.checksumSha256,
+        encryptedChecksumSha256: stored.encryptedChecksumSha256,
+        encryptionKeyVersion: stored.encryptionKeyVersion,
         // Upload validation (MIME, size, PDF magic) is complete at this point.
         status: DocumentStatus.READY,
       },

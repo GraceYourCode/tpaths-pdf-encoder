@@ -103,6 +103,7 @@ export class AdminService {
         emailVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
+        role: true,
         licenses: {
           select: { id: true, status: true, productId: true, createdAt: true },
         },

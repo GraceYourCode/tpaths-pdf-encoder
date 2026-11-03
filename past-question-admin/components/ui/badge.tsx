@@ -49,11 +49,25 @@ const STATUS_TONES: Record<string, BadgeTone> = {
   archived: "warning",
   // tokens
   active: "success",
+  unused: "info",
   redeemed: "info",
   revoked: "danger",
   expired: "warning",
   // students
   suspended: "danger",
+  pending: "info",
+  // documents
+  ready: "success",
+  processing: "info",
+  disabled: "warning",
+  deleted: "neutral",
+  failed: "danger",
+  // purchases and payments
+  paid: "success",
+  success: "success",
+  cancelled: "neutral",
+  refunded: "warning",
+  // licenses and devices reuse the states above (ACTIVE, SUSPENDED, REVOKED, EXPIRED)
 };
 
 export function StatusBadge({ status }: { status: string }) {

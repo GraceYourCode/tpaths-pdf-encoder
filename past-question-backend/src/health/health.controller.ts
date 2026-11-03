@@ -13,14 +13,19 @@
  * dependency of this project; it can be adopted later without changing the
  * routes.
  */
-import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { Public } from '../common/decorators/auth.decorator.js';
 
 import { PrismaService } from '../database/prisma.service.js';
+import { StorageService } from '../storage/storage.service.js';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   @Public()
   @Get()
@@ -44,6 +49,31 @@ export class HealthController {
     return {
       status: healthy ? 'ok' : 'error',
       database: healthy ? 'up' : 'down',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Readiness for load balancers: database AND object storage must be reachable.
+   * Returns 503 when either is down so traffic is drained from this instance.
+   */
+  @Public()
+  @Get('ready')
+  async ready(@Res({ passthrough: true }) res: Response): Promise<{
+    status: 'ok' | 'error';
+    database: 'up' | 'down';
+    storage: 'up' | 'down';
+    timestamp: string;
+  }> {
+    const [db, store] = await Promise.all([
+      this.prisma.isHealthy(),
+      this.storage.ping(),
+    ]);
+    if (!db || !store) res.status(HttpStatus.SERVICE_UNAVAILABLE);
+    return {
+      status: db && store ? 'ok' : 'error',
+      database: db ? 'up' : 'down',
+      storage: store ? 'up' : 'down',
       timestamp: new Date().toISOString(),
     };
   }

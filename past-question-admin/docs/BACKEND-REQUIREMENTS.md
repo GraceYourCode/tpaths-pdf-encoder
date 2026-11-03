@@ -1,3 +1,8 @@
+> **Superseded.** This Phase 3 contract predates the implemented backend and uses routes
+> (for example `/admin/auth/login`) that do not exist. The current route map is in
+> [`backend-integration.md`](backend-integration.md), and the open backend gaps are in
+> [`backend-integration-gaps.md`](backend-integration-gaps.md).
+
 # Backend Requirements — Admin Dashboard (Phase 3)
 
 This document is the contract the **Phase 2 backend** (`past-question-backend`)

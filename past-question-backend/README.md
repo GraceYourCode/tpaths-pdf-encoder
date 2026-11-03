@@ -1,18 +1,12 @@
 # Past Questions — Backend
 
 Backend API for a secure academic past-questions delivery platform.
-The repository now contains the Phase 2 foundation plus the core business modules and Phase 5 secure document system: authentication, users, products, purchases/payments, licenses, activation tokens, devices, audit logging, private encrypted document storage, and entitlement-gated content delivery.
-
-> **Scope note.** This phase deliberately ships *no* auth, payments, PDF
-> handling, DRM, or domain endpoints. See
-> [What is intentionally NOT here](#what-is-intentionally-not-here). The point
-> of the foundation is that every feature added later inherits validation,
-> security, error-shaping, and logging for free.
+The backend provides authentication (email verification, refresh rotation, sessions), users, products, Paystack payments (initialize, verify and signed webhook), licences and activation tokens, device registration with P-256 public keys, audit logging, encrypted-at-rest document storage (local disk for development, S3-compatible object storage for production), and entitlement-gated, device-bound artifact delivery in the TPQE v1 format. The authoritative API description is [docs/api-contract.md](docs/api-contract.md).
 
 - **Runtime:** Node.js 20+, TypeScript (ESM, `nodenext`)
 - **Framework:** NestJS 12
-- **Database:** PostgreSQL via Prisma 7 (driver-adapter model) — wired behind a
-  seam, not yet generated (see [Database](#database))
+- **Database:** PostgreSQL via Prisma 7 (driver-adapter model). The client is
+  generated into `src/generated/prisma` by `npm run prisma:generate`.
 - **Tests:** Vitest 4 (unit + e2e)
 - **Lint/format:** oxlint + Prettier
 
@@ -161,10 +155,14 @@ later phases; see [`docs/architecture.md`](docs/architecture.md).
 - **CORS** is environment-driven; production must use an explicit allowlist.
 - **Global ValidationPipe** with `whitelist`, `forbidNonWhitelisted`, and
   `transform` — unknown fields are rejected, payloads are typed.
-- **Rate limiting**: an in-memory fixed-window guard
-  (`src/common/guards/throttler.guard.ts`) protects every route. This is a
-  single-instance foundation; see its header for the `@nestjs/throttler`
-  upgrade path before horizontal scaling.
+- **Rate limiting**: a fixed-window guard (`src/common/guards/throttler.guard.ts`)
+  protects every route. In production the counters are shared through
+  PostgreSQL (`RateLimitWindow`, one atomic upsert per request) so limits hold
+  across instances. If the store is unavailable the guard fails closed with 503.
+- **Production configuration** is checked at boot by
+  `src/config/production-policy.ts`. The process refuses to start with local
+  storage, in-memory rate limiting, non-TLS database connections, wildcard CORS,
+  placeholder secrets, or test payment keys. See [docs/deployment.md](docs/deployment.md).
 - **Error handling** never leaks internals (see [error envelope](#error-envelope)).
 
 ### Logging policy
@@ -257,3 +255,15 @@ UNLICENSED — private project.
 
 ### Product pricing
 Products have a `price` (integer minor units; NGN uses kobo) and `currency` (default `NGN`). The payment verification flow validates the provider-reported amount against the product catalog price.
+
+---
+
+## Documentation map
+
+| Document | Purpose |
+| -------- | ------- |
+| [docs/api-contract.md](docs/api-contract.md) | Authoritative HTTP API contract for all clients |
+| [docs/pqe-artifact-protocol.md](docs/pqe-artifact-protocol.md) | Binary format and key derivation for `.pqe` artifacts |
+| [docs/document-security.md](docs/document-security.md) | Threat model, encryption design and limitations |
+| [docs/deployment.md](docs/deployment.md) | Production configuration, TLS, storage, monitoring and verification steps |
+

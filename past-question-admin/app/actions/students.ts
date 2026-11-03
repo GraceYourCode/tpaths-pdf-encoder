@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { describeError } from "@/lib/api/errors";
-import { setStudentStatus } from "@/lib/api/students";
+import { revokeStudentDevice, setStudentStatus } from "@/lib/api/students";
 import { STUDENT_STATUSES, type StudentStatus } from "@/lib/api/types";
 import { requireSession } from "@/lib/session";
 
@@ -33,5 +33,22 @@ export async function setStudentStatusAction(
   }
 
   revalidatePath("/students");
+  revalidatePath(`/students/${id}`);
+  return { ok: true };
+}
+
+export async function revokeStudentDeviceAction(
+  studentId: string,
+  deviceId: string,
+  _prev: SimpleActionState,
+  _formData: FormData,
+): Promise<SimpleActionState> {
+  await requireSession();
+  try {
+    await revokeStudentDevice(deviceId);
+  } catch (err) {
+    return { error: describeError(err).message };
+  }
+  revalidatePath(`/students/${studentId}`);
   return { ok: true };
 }

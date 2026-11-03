@@ -52,7 +52,7 @@ flowchart LR
 - **RequestId middleware** — honours an inbound `X-Request-Id` or generates a
   UUID; correlates logs and is echoed back on the response.
 - **Helmet / CORS** — HTTP hardening; CORS origins come from config.
-- **Throttler guard** — in-memory fixed-window rate limiting (foundation-grade).
+- **Throttler guard** — fixed-window rate limiting; shared through PostgreSQL in production, in-memory in development (see `src/common/guards/`).
 - **ValidationPipe** — rejects unknown fields, coerces/validates DTOs.
 - **Logging interceptor** — one structured line per request (see §2.5).
 - **AllExceptionsFilter** — maps any thrown error to the standard envelope.

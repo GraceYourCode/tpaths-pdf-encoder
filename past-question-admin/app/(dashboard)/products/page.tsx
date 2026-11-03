@@ -11,7 +11,7 @@ import { RefreshButton } from "@/components/ui/refresh-button";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { listProducts } from "@/lib/api/products";
 import { PRODUCT_STATUSES, type Paginated, type Product } from "@/lib/api/types";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatNaira } from "@/lib/format";
 import { firstStr, toPageNumber } from "@/lib/query";
 
 export default async function ProductsPage(props: PageProps<"/products">) {
@@ -134,6 +134,7 @@ export default async function ProductsPage(props: PageProps<"/products">) {
               <TR>
                 <TH>Title</TH>
                 <TH>Course</TH>
+                <TH>Price</TH>
                 <TH>Status</TH>
                 <TH>Document</TH>
                 <TH>Updated</TH>
@@ -158,11 +159,16 @@ export default async function ProductsPage(props: PageProps<"/products">) {
                       </span>
                     ) : null}
                   </TD>
+                  <TD className="text-muted-foreground">
+                    {product.priceKobo > 0
+                      ? formatNaira(product.priceKobo, { fromKobo: true })
+                      : <span className="text-warning">Not set</span>}
+                  </TD>
                   <TD>
                     <StatusBadge status={product.status} />
                   </TD>
                   <TD className="text-muted-foreground">
-                    {product.hasDocument === null ? "—" : product.hasDocument ? "PDF attached" : "None"}
+                    {product.hasDocument === null ? "—" : product.hasDocument ? "PDF ready" : "No ready PDF"}
                   </TD>
                   <TD className="text-muted-foreground">
                     {formatDate(product.updatedAt)}

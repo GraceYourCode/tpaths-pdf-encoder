@@ -74,6 +74,8 @@ export class ApiError extends Error {
 export function kindForStatus(status: number): ApiErrorKind {
   switch (status) {
     case 400:
+    case 413:
+    case 415:
     case 422:
       return "validation";
     case 401:
@@ -155,6 +157,8 @@ function defaultMessageForKind(kind: ApiErrorKind, status: number): string {
     case "not_found":
       return "The requested resource was not found.";
     case "validation":
+      if (status === 413) return "The file is too large. The maximum upload size is 25 MB.";
+      if (status === 415) return "That file type is not supported. Upload a PDF.";
       return "The request was rejected by the server.";
     case "conflict":
       return "The request conflicts with the current state.";

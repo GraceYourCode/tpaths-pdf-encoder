@@ -1,4 +1,5 @@
 import { plainToInstance } from 'class-transformer';
+import { assertProductionPolicy } from './production-policy.js';
 import {
   IsEnum,
   IsInt,
@@ -75,17 +76,9 @@ export function validateEnv(
     throw new Error(`Invalid environment configuration: ${details}`);
   }
 
-  if (
-    validated.NODE_ENV === NodeEnv.Production &&
-    (!process.env.JWT_ACCESS_SECRET ||
-      !process.env.JWT_REFRESH_SECRET ||
-      !process.env.CONTENT_AUTH_SECRET ||
-      !process.env.DEVICE_HASH_PEPPER ||
-      validated.CORS_ORIGINS === '*')
-  )
-    throw new Error(
-      'Production requires explicit JWT/content/device secrets and CORS_ORIGINS allowlist',
-    );
+  if (validated.NODE_ENV === NodeEnv.Production) {
+    assertProductionPolicy(process.env as Record<string, string | undefined>);
+  }
 
   return validated;
 }

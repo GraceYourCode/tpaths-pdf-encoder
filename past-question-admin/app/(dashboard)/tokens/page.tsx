@@ -143,6 +143,13 @@ export default async function TokensPage(props: PageProps<"/tokens">) {
             />
           ) : (
             <div className="space-y-4">
+              {tokensData.capped ? (
+                <p role="note" className="rounded-md border border-warning/40 bg-warning-bg/40 px-3 py-2 text-sm text-foreground">
+                  Showing tokens from the 100 most recent rows. The backend does not
+                  paginate tokens yet, so older tokens and filter results beyond this
+                  window may be missing.
+                </p>
+              ) : null}
               <Table>
                 <THead>
                   <TR>

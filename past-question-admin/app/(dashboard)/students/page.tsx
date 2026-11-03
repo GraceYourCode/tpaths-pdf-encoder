@@ -129,9 +129,12 @@ export default async function StudentsPage(props: PageProps<"/students">) {
               {data.items.map((student) => (
                 <TR key={student.id}>
                   <TD>
-                    <span className="font-medium text-foreground">
+                    <Link
+                      href={`/students/${student.id}`}
+                      className="font-medium text-primary hover:underline"
+                    >
                       {student.name || "—"}
-                    </span>
+                    </Link>
                     <span className="block text-xs text-muted-foreground">
                       {student.email}
                     </span>

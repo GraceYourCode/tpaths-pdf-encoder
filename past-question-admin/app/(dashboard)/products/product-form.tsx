@@ -7,6 +7,7 @@ import { buttonClasses, Button } from "@/components/ui/button";
 import { InlineError } from "@/components/ui/error-state";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { PRODUCT_STATUSES, type Product } from "@/lib/api/types";
+import { koboToNairaInput } from "@/lib/money";
 
 type ProductFormAction = (
   state: ProductFormState,
@@ -95,6 +96,27 @@ export function ProductForm({
             name="level"
             defaultValue={product?.level ?? ""}
             placeholder="e.g. 100"
+          />
+        </Field>
+        <Field
+          label="Price (₦)"
+          htmlFor="price"
+          required
+          error={state.fieldErrors?.price}
+          hint={
+            product && product.priceKobo <= 0
+              ? "This product has no price yet. Set one before publishing."
+              : "Stored in kobo by the backend. Enter naira, for example 2500 or 2500.50."
+          }
+        >
+          <Input
+            id="price"
+            name="price"
+            inputMode="decimal"
+            defaultValue={koboToNairaInput(product?.priceKobo)}
+            placeholder="e.g. 2500.00"
+            required
+            aria-invalid={Boolean(state.fieldErrors?.price) || undefined}
           />
         </Field>
         <Field

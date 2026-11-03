@@ -1,5 +1,6 @@
 import { NodeEnv } from './env.validation.js';
 export interface AppConfig {
+  trustProxy: boolean | number | string;
   env: NodeEnv;
   isProduction: boolean;
   port: number;
@@ -13,14 +14,18 @@ export interface DatabaseConfig {
 export interface ThrottleConfig {
   ttlMs: number;
   limit: number;
+  store: 'memory' | 'postgres';
 }
 export interface SecurityConfig {
+  documentMasterKeys: string;
+  documentMasterKeyVersion: number;
   accessSecret: string;
   refreshSecret: string;
   contentSecret: string;
   deviceHashPepper: string;
   accessExpirationSec: number;
   refreshExpirationMs: number;
+  artifactEncryptionKey: string;
 }
 export interface PaymentConfig {
   provider: string;
@@ -28,7 +33,15 @@ export interface PaymentConfig {
   webhookSecret: string;
 }
 export interface StorageConfig {
+  driver: 'local' | 's3';
   localDir: string;
+  s3: {
+    endpoint: string;
+    bucket: string;
+    region: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+  };
 }
 export interface ContentConfig {
   authorizationTtlMs: number;
@@ -47,6 +60,13 @@ export interface Configuration {
   content: ContentConfig;
   mail: MailConfig;
 }
+function parseTrustProxy(raw: string | undefined): boolean | number | string {
+  if (raw === undefined || raw === '' || raw === 'false') return false;
+  if (raw === 'true') return true;
+  if (/^\d+$/.test(raw)) return Number(raw);
+  return raw; // e.g. 'loopback' or a comma-separated subnet list
+}
+
 function parseCorsOrigins(raw: string | undefined): string[] | boolean {
   const v = (raw ?? '*').trim();
   return v === '*' || !v
@@ -66,11 +86,13 @@ export default (): Configuration => {
       apiPrefix: process.env.API_PREFIX ?? 'api',
       apiVersion: process.env.API_VERSION ?? '1',
       corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
+      trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
     },
     database: { url: process.env.DATABASE_URL ?? '' },
     throttle: {
       ttlMs: Number(process.env.THROTTLE_TTL_MS ?? 60000),
       limit: Number(process.env.THROTTLE_LIMIT ?? 120),
+      store: process.env.THROTTLE_STORE === 'postgres' ? 'postgres' : 'memory',
     },
     security: {
       accessSecret:
@@ -87,6 +109,11 @@ export default (): Configuration => {
       refreshExpirationMs: Number(
         process.env.JWT_REFRESH_EXPIRATION_MS ?? 2592000000,
       ),
+      documentMasterKeys: process.env.DOCUMENT_MASTER_KEYS ?? '',
+      documentMasterKeyVersion: Number(process.env.DOCUMENT_MASTER_KEY_VERSION ?? 1),
+      artifactEncryptionKey:
+        process.env.ARTIFACT_ENCRYPTION_KEY ??
+        'development-artifact-encryption-key-change-me',
     },
     payment: {
       provider: process.env.PAYMENT_PROVIDER ?? 'paystack',
@@ -96,7 +123,17 @@ export default (): Configuration => {
         process.env.PAYMENT_SECRET_KEY ??
         '',
     },
-    storage: { localDir: process.env.STORAGE_LOCAL_DIR ?? './private-storage' },
+    storage: {
+      driver: process.env.STORAGE_DRIVER === 's3' ? 's3' : 'local',
+      localDir: process.env.STORAGE_LOCAL_DIR ?? './private-storage',
+      s3: {
+        endpoint: process.env.S3_ENDPOINT ?? '',
+        bucket: process.env.S3_BUCKET ?? '',
+        region: process.env.S3_REGION ?? '',
+        accessKeyId: process.env.S3_ACCESS_KEY_ID ?? '',
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? '',
+      },
+    },
     content: {
       authorizationTtlMs: Number(
         process.env.CONTENT_AUTHORIZATION_TTL_MS ?? 300000,

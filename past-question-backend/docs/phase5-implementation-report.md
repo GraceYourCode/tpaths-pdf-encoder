@@ -1,3 +1,7 @@
+> **Superseded.** This report describes the Phase 5 design (RSA-OAEP wrapping and
+> PBKDF2-based artifacts). The current design is in `docs/pqe-artifact-protocol.md`
+> and `docs/document-security.md`. Kept for history only.
+
 # Phase 5 Implementation Report
 
 ## Scope

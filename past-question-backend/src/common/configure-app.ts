@@ -27,6 +27,10 @@ export function configureApp(app: INestApplication, config: AppConfig): void {
   app.use(json({ limit: '2mb', verify: (req: any, _res: any, buf: Buffer) => { req.rawBody = buf.toString('utf8'); } }));
   app.use(urlencoded({ extended: false, limit: '2mb' }));
 
+  // Trust reverse-proxy headers only when explicitly configured, so that
+  // req.ip (used for rate limiting and audit) reflects the real client.
+  app.set('trust proxy', config.trustProxy);
+
   // Security headers.
   app.use(helmet());
 

@@ -78,3 +78,28 @@ replace a registered key without revoking the device. Artifact delivery
 requires the device to have a registered key.
 
 The mobile private key must remain on the device in platform-protected storage.
+
+## At-rest encryption of stored originals
+
+Original PDFs are encrypted before they reach object storage. Each object has a
+random 256-bit data key, wrapped under a versioned master key (AES-256-GCM).
+The object is authenticated end to end. On delivery the decrypted PDF is checked
+against the SHA-256 recorded at upload. A mismatch is audited as
+`DOCUMENT_INTEGRITY_FAILURE` and no artifact is produced. Layout and key rotation
+are described in `src/common/utils/at-rest.ts` and `docs/deployment.md`.
+
+Storage keys and storage credentials are never returned to clients.
+
+## Limitations
+
+- Encryption does not prevent a legitimately entitled user from copying content
+  they can view. Decrypted content exists on the device while it is displayed.
+- A rooted or jailbroken device, a debugger, or screen capture can expose
+  decrypted content. Hardware-backed device keys reduce key extraction, but they
+  do not make the rendered content secret.
+- Compromise of the running backend process exposes the master keys held in
+  memory and the ability to issue artifacts.
+- Offline access: artifacts already downloaded remain readable on that device
+  until the local cache policy removes them. Server-side revocation prevents new
+  downloads only.
+

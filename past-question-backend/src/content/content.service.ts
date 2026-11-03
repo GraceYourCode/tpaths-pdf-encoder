@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -189,7 +190,23 @@ export class ContentService {
     if (!document || document.status !== DocumentStatus.READY)
       throw new ForbiddenException('Document is not ready for delivery');
 
-    const rawPdfBuffer = await this.storage.getPrivate(document.storageKey);
+    let rawPdfBuffer: Buffer;
+    try {
+      // Decrypts and verifies the stored original against the upload checksum.
+      rawPdfBuffer = await this.storage.getPrivateDocument(
+        document.storageKey,
+        document.checksumSha256,
+      );
+    } catch (error) {
+      await this.audit.log({
+        userId: license.userId,
+        action: 'DOCUMENT_INTEGRITY_FAILURE',
+        entityType: 'Document',
+        entityId: document.id,
+        metadata: { reason: error instanceof Error ? error.name : 'unknown' },
+      });
+      throw new InternalServerErrorException('Document could not be delivered');
+    }
 
     const artifactBuffer = encodePqeArtifact({
       pdf: rawPdfBuffer,

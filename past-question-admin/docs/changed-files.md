@@ -1,33 +1,52 @@
-# Changed Files
+# Changed files (admin console remediation)
 
-| File | Action | Reason |
-|---|---|---|
-| `lib/api/types.ts` | Modified | Replaced the old planned-contract types with adapters for the implemented backend enums and response shapes. |
-| `lib/api/auth.ts` | Modified | Connected authentication to the actual `/auth/*` routes and enforced admin-role mapping. |
-| `lib/api/server.ts` | Modified | Centralized server-side cookie token forwarding without a session import cycle. |
-| `lib/api/products.ts` | Modified | Connected actual admin product/document routes and mapped backend product/document shapes. |
-| `lib/api/students.ts` | Modified | Connected actual student routes and mapped uppercase backend statuses/pagination. |
-| `lib/api/tokens.ts` | Modified | Connected actual token list/create/revoke routes and mapped the backend's single-token response. |
-| `lib/api/dashboard.ts` | Modified | Connected `GET /admin/dashboard` and mapped nested aggregate counts. |
-| `lib/api/errors.ts` | Modified | Prevented unexpected internal error messages from being shown to administrators. |
-| `lib/api/errors.test.ts` | Modified | Updated the safe generic-error expectation. |
-| `lib/session.ts` | Modified | Validates the backend identity for protected sessions and requires an admin role. |
-| `proxy.ts` | Modified | Adds expired-access-token refresh using the httpOnly refresh cookie. |
-| `next.config.ts` | Modified | Raises the Server Action body limit to the backend's 25 MB PDF limit. |
-| `.env.example` | Modified | Documents the server-only backend URL and session configuration. |
-| `app/actions/auth.ts` | Modified | Uses the real backend admin login result through the updated auth service. |
-| `app/actions/products.ts` | Modified | Maps form fields to actual product DTOs and forwards required document metadata. |
-| `app/actions/students.ts` | Modified | Uses actual backend student status values through the API mapper. |
-| `app/actions/tokens.ts` | Modified | Maps batch UI requests to repeated real single-token backend calls without persisting plaintext codes. |
-| `app/(dashboard)/page.tsx` | Modified | Displays real dashboard aggregates supported by the backend. |
-| `app/(dashboard)/products/page.tsx` | Modified | Removes unsupported price display and uses actual product/document data. |
-| `app/(dashboard)/products/product-form.tsx` | Modified | Sends the backend-supported product fields while preserving the existing form structure. |
-| `app/(dashboard)/products/[id]/page.tsx` | Modified | Uses actual product/document mappings and backend archival lifecycle. |
-| `app/(dashboard)/products/[id]/document-manager.tsx` | Modified | Matches the backend's 25 MB upload limit and document metadata. |
-| `app/(dashboard)/products/[id]/delete-product.tsx` | Modified | Labels the existing delete control as archive because the backend archives products. |
-| `app/(dashboard)/tokens/page.tsx` | Modified | Displays actual token purchase linkage and product titles without exposing secrets. |
-| `app/(dashboard)/tokens/token-generator.tsx` | Modified | Removes the unsupported student-email assignment field. |
-| `README.md` | Modified | Replaced the obsolete planned-backend documentation with the implemented integration. |
-| `docs/backend-integration.md` | Added | Documents route mapping, session flow, security, and contract gaps. |
-| `docs/backend-integration-gaps.md` | Added | Lists backend limitations that cannot be represented without inventing data or endpoints. |
-| `docs/changed-files.md` | Added | Provides this change manifest. |
+Scope: the 25 issues in the admin audit (product pricing, document lifecycle, missing admin modules, token/student views, testing). The backend was read but not modified. Every backend defect found is in `docs/backend-integration-gaps.md`.
+
+## Pure logic (new)
+- `lib/money.ts`: naira ↔ kobo parsing and formatting, with bounds for the backend `Int` column.
+- `lib/jwt.ts`: `exp` inspection used by the proxy to decide when to refresh.
+- `lib/products/form.ts`: product form parsing (title, status, price). Moved out of the Server Action file, which may only export async functions.
+- `lib/products/upload.ts`: PDF pre-checks and the multipart payload (`file` + `title`, never `status`).
+- `lib/api/token-model.ts`: token mapping, filtering and paging, split out so it is testable without `next/headers`.
+
+## Pure logic (rewritten)
+- `lib/api/types.ts`: backend enums and shapes for price/currency, the real document lifecycle, `toBackendProductBody` (explicit DTO mapping), purchases, payments, licenses, devices, audit events and student detail.
+- `lib/api/errors.ts`: 413 and 415 map to upload-specific copy.
+
+## Server wrappers (rewritten or new)
+- `lib/api/products.ts`: create/update send `price` in kobo and `currency`. Document upload and removal, plus a PATCH to retire a version.
+- `lib/api/tokens.ts`: fetch capped list, filter and page in memory, report truncation. Single-token generation and revoke unchanged.
+- `lib/api/students.ts`: student detail, status change, and admin device revoke (depends on a backend route that does not exist yet).
+- `lib/api/finance.ts` (new): purchases, licenses (list, detail, suspend, revoke), audit events.
+
+## Server Actions
+- `app/actions/products.ts`: price in create and update. Upload no longer sends `status: "ACTIVE"`, retires previous READY versions, and reports real lifecycle state. Delete revalidates the product page.
+- `app/actions/students.ts`: status change revalidates the detail page. Device revoke added.
+- `app/actions/licenses.ts` (new): suspend and revoke.
+
+## UI (changed)
+- `app/(dashboard)/products/product-form.tsx`: price field (naira), with a hint for unpriced products.
+- `app/(dashboard)/products/page.tsx`: price column.
+- `app/(dashboard)/products/[id]/page.tsx`: price line, document wiring.
+- `app/(dashboard)/products/[id]/document-manager.tsx`: lifecycle badge, failure reason, version count, remove hidden once disabled.
+- `app/(dashboard)/tokens/page.tsx`: notice when the list is capped at 100.
+- `app/(dashboard)/students/page.tsx`: names link to the detail page.
+- `components/ui/badge.tsx`: tones for document, purchase and payment states.
+- `components/layout/nav.ts` and `nav.test.ts`: Purchases, Payments, Licenses and Audit log.
+- `proxy.ts`: uses `lib/jwt.ts`.
+
+## UI (new)
+- `app/(dashboard)/students/[id]/page.tsx` and `revoke-device-button.tsx`: profile, status, purchases, licenses, devices.
+- `app/(dashboard)/purchases/page.tsx`.
+- `app/(dashboard)/payments/page.tsx`.
+- `app/(dashboard)/licenses/page.tsx`, `licenses/[id]/page.tsx`, `licenses/[id]/license-actions.tsx`.
+- `app/(dashboard)/audit-logs/page.tsx`.
+
+## Tests (new or updated)
+- `lib/money.test.ts`, `lib/jwt.test.ts`, `lib/products/form.test.ts`, `lib/products/upload.test.ts`, `lib/api/token-model.test.ts`, `lib/api/errors-upload.test.ts`.
+- `lib/api/types.test.ts` (rewritten for the real document model and DTO contract).
+- `components/layout/nav.test.ts` (updated for the new navigation).
+
+## Docs
+- `README.md`, `docs/backend-integration.md`, `docs/backend-integration-gaps.md`, `docs/changed-files.md`.
+- `docs/BACKEND-REQUIREMENTS.md`: marked as superseded.

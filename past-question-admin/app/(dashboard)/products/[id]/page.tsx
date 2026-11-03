@@ -22,7 +22,7 @@ import { RefreshButton } from "@/components/ui/refresh-button";
 import { ApiError } from "@/lib/api/errors";
 import { getProduct } from "@/lib/api/products";
 import type { Product } from "@/lib/api/types";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatNaira } from "@/lib/format";
 import { ProductForm } from "../product-form";
 import { DeleteProduct } from "./delete-product";
 import { DocumentManager } from "./document-manager";
@@ -79,6 +79,12 @@ export default async function ProductDetailPage(
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <StatusBadge status={product.status} />
+        <span>
+          Price{" "}
+          {product.priceKobo > 0
+            ? formatNaira(product.priceKobo, { fromKobo: true })
+            : "not set"}
+        </span>
         <span>Updated {formatDateTime(product.updatedAt)}</span>
       </div>
 
@@ -108,8 +114,13 @@ export default async function ProductDetailPage(
             <CardContent>
               <DocumentManager
                 uploadAction={uploadDocumentAction.bind(null, product.id)}
-                deleteAction={product.document ? deleteDocumentAction.bind(null, product.document.id) : deleteDocumentAction.bind(null, "")}
-                doc={product.document ?? null}
+                deleteAction={
+                  product.document
+                    ? deleteDocumentAction.bind(null, product.document.id, product.id)
+                    : undefined
+                }
+                doc={product.document}
+                versionCount={product.documents?.length ?? 0}
               />
             </CardContent>
           </Card>

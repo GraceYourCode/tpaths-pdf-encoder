@@ -275,6 +275,14 @@ model PasswordResetToken {
   @@index([userId, expiresAt])
 }
 
+model RateLimitWindow {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
 model AuditLog {
   id         String   @id @default(uuid())
   userId     String?
