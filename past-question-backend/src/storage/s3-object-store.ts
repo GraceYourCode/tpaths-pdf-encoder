@@ -92,7 +92,7 @@ export class S3ObjectStore implements ObjectStore {
     return fetch(this.url(path), {
       method,
       headers: this.sign(method, path, body, extra),
-      body: body.length > 0 ? body : undefined,
+      body: body.length > 0 ? new Uint8Array(body) : undefined,
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   }
@@ -103,6 +103,11 @@ export class S3ObjectStore implements ObjectStore {
       'x-amz-server-side-encryption': 'AES256',
     });
     if (!r.ok) throw new Error(`Object store PUT failed with status ${r.status}`);
+  }
+
+  async delete(key: string): Promise<void> {
+    const r = await this.send('DELETE', this.objectPath(key), Buffer.alloc(0));
+    if (!r.ok && r.status !== 404) throw new Error(`Object store DELETE failed with status ${r.status}`);
   }
 
   async get(key: string): Promise<Buffer> {

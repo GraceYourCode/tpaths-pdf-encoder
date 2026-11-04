@@ -29,7 +29,7 @@ export function configureApp(app: INestApplication, config: AppConfig): void {
 
   // Trust reverse-proxy headers only when explicitly configured, so that
   // req.ip (used for rate limiting and audit) reflects the real client.
-  app.set('trust proxy', config.trustProxy);
+  app.getHttpAdapter().getInstance().set('trust proxy', config.trustProxy);
 
   // Security headers.
   app.use(helmet());

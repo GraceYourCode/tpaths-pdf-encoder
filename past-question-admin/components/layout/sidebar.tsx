@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { X } from "lucide-react";
-import { Brand } from "./brand";
 import { isNavItemActive, NAV_ITEMS } from "./nav";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -22,6 +22,16 @@ export function Sidebar({
   onClose: () => void;
 }) {
   const pathname = usePathname();
+
+  // Mobile drawer: Escape closes it, as keyboard users expect from a dialog-style panel.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   return (
     <>

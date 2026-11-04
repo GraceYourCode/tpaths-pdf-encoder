@@ -72,6 +72,8 @@ export class OpenApiController {
         '/admin/licenses/{id}/suspend': { post: op('Suspend license') },
         '/admin/licenses/{id}/revoke': { post: op('Revoke license') },
         '/admin/purchases': { get: op('List purchases') },
+        '/admin/documents/{id}/retry': { post: op('Retry activation of a stalled upload') },
+        '/admin/devices/{id}/revoke': { post: op('Revoke any device (requires reason)') },
         '/admin/purchases/{id}': { get: op('Get purchase') },
       },
     };

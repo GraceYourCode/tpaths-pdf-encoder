@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 
@@ -103,7 +103,6 @@ export class AdminService {
         emailVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
-        role: true,
         licenses: {
           select: { id: true, status: true, productId: true, createdAt: true },
         },
@@ -153,11 +152,49 @@ export class AdminService {
     return { id: out.id, status: out.status };
   }
 
+  /** Filterable, paginated audit log. */
   async auditLogs(q: any) {
-    return (this.prisma as any).auditLog.findMany({
-      take: Math.min(100, Number(q.limit || 50)),
-      orderBy: { createdAt: 'desc' },
-    });
+    const page = Math.max(1, Math.floor(Number(q?.page ?? 1)) || 1);
+    const limit = Math.min(100, Math.max(1, Math.floor(Number(q?.limit ?? 50)) || 50));
+    const where: any = {};
+    if (q?.action) where.action = String(q.action);
+    if (q?.entityType) where.entityType = String(q.entityType);
+    if (q?.entityId) where.entityId = String(q.entityId);
+    if (q?.userId) where.userId = String(q.userId);
+    if (q?.from || q?.to) {
+      const range: any = {};
+      if (q.from) {
+        const d = new Date(String(q.from));
+        if (Number.isNaN(d.getTime())) throw new BadRequestException('Invalid from date');
+        range.gte = d;
+      }
+      if (q.to) {
+        const d = new Date(String(q.to));
+        if (Number.isNaN(d.getTime())) throw new BadRequestException('Invalid to date');
+        range.lte = d;
+      }
+      where.createdAt = range;
+    }
+    const [items, total] = await Promise.all([
+      (this.prisma as any).auditLog.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          userId: true,
+          action: true,
+          entityType: true,
+          entityId: true,
+          ipAddress: true,
+          metadata: true,
+          createdAt: true,
+        },
+      }),
+      (this.prisma as any).auditLog.count({ where }),
+    ]);
+    return { items, page, limit, total, totalPages: Math.ceil(total / limit) };
   }
   
   async tokens(q: any) {

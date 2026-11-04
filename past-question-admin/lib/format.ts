@@ -116,3 +116,9 @@ export function initialsFromName(name: string | null | undefined): string {
   const second = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
   return (first + second).toUpperCase();
 }
+
+/** Locale-grouped integer ("1,234"); "—" for non-finite input. */
+export function formatNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return Math.round(value).toLocaleString("en-NG");
+}

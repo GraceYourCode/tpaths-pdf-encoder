@@ -26,6 +26,15 @@ export class LocalObjectStore implements ObjectStore {
     await writeFile(path, data);
   }
 
+  async delete(key: string): Promise<void> {
+    const { unlink } = await import('node:fs/promises');
+    try {
+      await unlink(this.pathFor(key));
+    } catch (e: any) {
+      if (e?.code !== 'ENOENT') throw e;
+    }
+  }
+
   async get(key: string): Promise<Buffer> {
     try {
       return await readFile(this.pathFor(key));

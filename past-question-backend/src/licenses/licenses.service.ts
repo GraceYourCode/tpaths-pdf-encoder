@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -7,6 +8,32 @@ import {
 import { PrismaService } from '../database/prisma.service.js';
 import { randomToken, sha256 } from '../common/utils/crypto.js';
 import { AuditService } from '../audit/audit.service.js';
+
+const LICENSE_STATUSES = ['ACTIVE', 'SUSPENDED', 'REVOKED', 'EXPIRED'];
+
+/** Validated page/limit parsing shared by admin list endpoints. */
+export function parsePaging(q: any): { page: number; limit: number; skip: number } {
+  const page = Math.max(1, Math.floor(Number(q?.page ?? 1)) || 1);
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(q?.limit ?? 20)) || 20));
+  return { page, limit, skip: (page - 1) * limit };
+}
+
+/** Parses optional `from`/`to` ISO dates into a createdAt range. */
+export function parseDateRange(q: any): { gte?: Date; lte?: Date } | undefined {
+  if (!q?.from && !q?.to) return undefined;
+  const range: { gte?: Date; lte?: Date } = {};
+  if (q.from) {
+    const d = new Date(String(q.from));
+    if (Number.isNaN(d.getTime())) throw new BadRequestException('Invalid from date');
+    range.gte = d;
+  }
+  if (q.to) {
+    const d = new Date(String(q.to));
+    if (Number.isNaN(d.getTime())) throw new BadRequestException('Invalid to date');
+    range.lte = d;
+  }
+  return range;
+}
 
 @Injectable()
 export class LicensesService {
@@ -43,6 +70,10 @@ export class LicensesService {
         license.productId !== t.productId
       )
         throw new ForbiddenException('License not found');
+      if (license.status !== 'ACTIVE')
+        throw new ForbiddenException('License is not active');
+      if (license.expiresAt && license.expiresAt <= new Date())
+        throw new ForbiddenException('License has expired');
       if (license.deviceId && license.deviceId !== device.id)
         throw new ConflictException(
           'License is already bound to another device',
@@ -95,7 +126,7 @@ export class LicensesService {
             title: true,
             status: true,
             documents: {
-              where: { status: 'ACTIVE' },
+              where: { status: 'READY' },
               select: {
                 id: true,
                 title: true,
@@ -124,6 +155,18 @@ export class LicensesService {
     )
       return { valid: false };
 
+    if (l.deviceId) {
+      const device = await (this.prisma as any).device.findUnique({
+        where: { id: l.deviceId },
+      });
+      if (!device || device.status !== 'ACTIVE') return { valid: false };
+    }
+    const owner = await (this.prisma as any).user.findUnique({
+      where: { id: l.userId },
+      select: { status: true },
+    });
+    if (!owner || owner.status !== 'ACTIVE') return { valid: false };
+
     await (this.prisma as any).license.update({
       where: { id },
       data: { lastValidatedAt: new Date() },
@@ -132,21 +175,27 @@ export class LicensesService {
   }
 
   async adminList(q: any) {
-    const page = Math.max(1, Number(q.page || 1));
-    const limit = Math.min(100, Math.max(1, Number(q.limit || 20)));
+    const { page, limit, skip } = parsePaging(q);
     const where: any = {};
-    if (q.status) where.status = q.status;
+    if (q.status !== undefined) {
+      if (!LICENSE_STATUSES.includes(q.status))
+        throw new BadRequestException('Invalid license status');
+      where.status = q.status;
+    }
+    if (q.userId) where.userId = String(q.userId);
+    if (q.productId) where.productId = String(q.productId);
+    if (q.deviceId) where.deviceId = String(q.deviceId);
+    const range = parseDateRange(q);
+    if (range) where.createdAt = range;
     const [items, total] = await Promise.all([
       (this.prisma as any).license.findMany({
         where,
-        skip: (page - 1) * limit,
+        skip,
         take: limit,
         include: {
-          user: {
-            select: { id: true, email: true, firstName: true, lastName: true },
-          },
+          user: { select: { id: true, email: true, firstName: true, lastName: true } },
           product: { select: { id: true, title: true } },
-          purchase: { select: { reference: true } },
+          purchase: { select: { id: true, reference: true, status: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -170,12 +219,26 @@ export class LicensesService {
     return l;
   }
 
+  /**
+   * Allowed transitions:
+   *   ACTIVE    -> SUSPENDED | REVOKED
+   *   SUSPENDED -> ACTIVE    | REVOKED
+   *   REVOKED   -> (none)
+   */
   async setStatus(
     id: string,
-    status: 'SUSPENDED' | 'REVOKED',
+    status: 'ACTIVE' | 'SUSPENDED' | 'REVOKED',
     adminId: string,
   ) {
     const l = await this.adminGet(id);
+    const allowed: Record<string, string[]> = {
+      ACTIVE: ['SUSPENDED', 'REVOKED'],
+      SUSPENDED: ['ACTIVE', 'REVOKED'],
+      REVOKED: [],
+      EXPIRED: [],
+    };
+    if (!(allowed[l.status] ?? []).includes(status))
+      throw new ConflictException(`License cannot change from ${l.status} to ${status}`);
     const out = await (this.prisma as any).license.update({
       where: { id },
       data: { status },
@@ -185,10 +248,11 @@ export class LicensesService {
       action: `LICENSE_${status}`,
       entityType: 'License',
       entityId: id,
+      metadata: { from: l.status },
     });
     return out;
   }
-  
+
   async generateToken(
     productId: string,
     expiresAt?: Date,

@@ -577,6 +577,7 @@ export interface DashboardStats {
   totalTokens: number;
   activeTokens: number;
   paidPurchases: number;
+  recentActivity: AuditEvent[];
 }
 
 export interface Paginated<T> {

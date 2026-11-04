@@ -5,7 +5,6 @@
  * called from env validation at boot. Returns every violation at once so an
  * operator can fix a deployment in one pass.
  */
-import { parseMasterKeyring, AtRestError } from '../common/utils/at-rest.js';
 
 const MIN_SECRET_LENGTH = 32;
 const PLACEHOLDER_MARKERS = ['development', 'change-me', 'changeme', 'example', 'secret'];
@@ -31,13 +30,14 @@ export function productionPolicyViolations(env: Record<string, string | undefine
     else seen.set(v, name);
   }
 
-  // Document encryption master keys.
-  try {
-    const version = Number(get('DOCUMENT_MASTER_KEY_VERSION') || '1');
-    parseMasterKeyring(get('DOCUMENT_MASTER_KEYS'), version);
-  } catch (e) {
-    errors.push(`DOCUMENT_MASTER_KEYS invalid: ${e instanceof AtRestError ? e.message : 'unknown error'}`);
+  // Document data keys are wrapped by AWS KMS. Environment keyrings are development-only.
+  if (get('DOCUMENT_KEY_PROVIDER') !== 'aws-kms')
+    errors.push('DOCUMENT_KEY_PROVIDER must be aws-kms in production (environment keyrings are not permitted)');
+  for (const name of ['KMS_KEY_ID', 'KMS_REGION', 'KMS_ACCESS_KEY_ID', 'KMS_SECRET_ACCESS_KEY']) {
+    if (!get(name)) errors.push(`${name} is required`);
   }
+  const kmsEndpoint = get('KMS_ENDPOINT');
+  if (kmsEndpoint && !kmsEndpoint.startsWith('https://')) errors.push('KMS_ENDPOINT must be an https URL');
 
   // Payments: live key only.
   if (!get('PAYMENT_SECRET_KEY')) errors.push('PAYMENT_SECRET_KEY is required');
@@ -67,6 +67,10 @@ export function productionPolicyViolations(env: Record<string, string | undefine
   for (const name of ['S3_BUCKET', 'S3_REGION', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']) {
     if (!get(name)) errors.push(`${name} is required`);
   }
+
+  // Email: verification must be deliverable before accounts are accepted.
+  if (!get('RESEND_API_KEY')) errors.push('RESEND_API_KEY is required (verification email must be deliverable)');
+  if (!get('EMAIL_FROM')) errors.push('EMAIL_FROM is required');
 
   // Rate limiting must be shared across instances.
   if (get('THROTTLE_STORE') !== 'postgres')

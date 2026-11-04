@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { BrandMark } from "@/components/layout/brand";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Sign in" };

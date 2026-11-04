@@ -19,6 +19,8 @@ export interface ThrottleConfig {
 export interface SecurityConfig {
   documentMasterKeys: string;
   documentMasterKeyVersion: number;
+  documentKeyProvider: 'env' | 'aws-kms';
+  kms: { keyId: string; region: string; endpoint: string; accessKeyId: string; secretAccessKey: string };
   accessSecret: string;
   refreshSecret: string;
   contentSecret: string;
@@ -111,6 +113,16 @@ export default (): Configuration => {
       ),
       documentMasterKeys: process.env.DOCUMENT_MASTER_KEYS ?? '',
       documentMasterKeyVersion: Number(process.env.DOCUMENT_MASTER_KEY_VERSION ?? 1),
+      documentKeyProvider: process.env.DOCUMENT_KEY_PROVIDER === 'aws-kms' ? 'aws-kms' : 'env',
+      kms: {
+        keyId: process.env.KMS_KEY_ID ?? '',
+        region: process.env.KMS_REGION ?? process.env.S3_REGION ?? '',
+        endpoint:
+          process.env.KMS_ENDPOINT ??
+          `https://kms.${process.env.KMS_REGION ?? process.env.S3_REGION ?? 'us-east-1'}.amazonaws.com`,
+        accessKeyId: process.env.KMS_ACCESS_KEY_ID ?? '',
+        secretAccessKey: process.env.KMS_SECRET_ACCESS_KEY ?? '',
+      },
       artifactEncryptionKey:
         process.env.ARTIFACT_ENCRYPTION_KEY ??
         'development-artifact-encryption-key-change-me',

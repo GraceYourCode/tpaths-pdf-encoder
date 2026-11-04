@@ -1,4 +1,5 @@
-import type { DashboardStats } from "./types";
+import type { BackendAuditLog, DashboardStats } from "./types";
+import { mapAuditEvent } from "./types";
 import { backendRequest } from "./server";
 
 interface BackendDashboard {
@@ -7,7 +8,7 @@ interface BackendDashboard {
   licenses: { total: number; active: number };
   tokens: { total: number; active: number };
   purchases: { paid: number };
-  recentActivity: unknown[];
+  recentActivity: BackendAuditLog[];
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -22,5 +23,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     totalTokens: data.tokens.total,
     activeTokens: data.tokens.active,
     paidPurchases: data.purchases.paid,
+    recentActivity: (data.recentActivity ?? []).map(mapAuditEvent),
   };
 }

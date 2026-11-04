@@ -53,7 +53,7 @@ Machine-readable reasons for 403 responses on login:
 
 | Method | Path | Auth | Request | Response |
 | ------ | ---- | ---- | ------- | -------- |
-| POST | `/auth/register` | public | `{ email, password, firstName, lastName, whatsapp }` | `201` `{ user }` (plus `verificationToken` outside production only). **409** if email exists |
+| POST | `/auth/register` | public | `{ email, password, firstName, lastName, whatsapp }` | `201` `{ user }` (plus `verificationToken` outside production only). **409** if email exists. **503** if the verification email cannot be delivered; no account is created in that case |
 | POST | `/auth/login` | public | `{ email, password }` | `200` `{ accessToken, refreshToken, user }`. **403** `EMAIL_NOT_VERIFIED` / `ACCOUNT_INACTIVE` |
 | POST | `/auth/refresh` | public | `{ token }` (refresh token) | `200` `{ accessToken, refreshToken }`. Reuse of a rotated token revokes the session family |
 | POST | `/auth/logout` | bearer | — | `{ loggedOut: true }` |
@@ -91,17 +91,19 @@ returned by registration and use it for every later device-scoped call.
 
 | Method | Path | Auth | Request | Response |
 | ------ | ---- | ---- | ------- | -------- |
-| POST | `/devices/register` | bearer | `{ deviceId, platform, appVersion?, publicKey? }` | `{ id, platform, appVersion, status, lastSeenAt, createdAt, publicKeyRegistered, publicKeyError? }` |
+| POST | `/devices/register` | bearer | `{ deviceId, platform, appVersion?, publicKey }` | `{ id, platform, appVersion, status, lastSeenAt, createdAt, publicKeyRegistered: true }`. **400** if the key is invalid; **403** if the device is revoked |
 | GET | `/devices` | bearer | — | Devices owned by the caller |
 | POST | `/devices/{id}/validate` | bearer | — | `{ valid: true }` or **403** |
-| POST | `/devices/{id}/revoke` | bearer | — | `{ revoked: true }` |
+| POST | `/devices/{id}/revoke` | bearer | — | `{ revoked: true }`. Owner only |
+
+Administrators can revoke any device: `POST /admin/devices/{id}/revoke` with `{ reason }` (min 3 characters). Revocation is recorded with time and reason.
 
 `deviceId` is the client-side installation identifier used for the device hash.
-`publicKey` is base64-encoded DER `SubjectPublicKeyInfo` for a **P-256** key
-(91 bytes). Keys that fail validation are not stored; the response reports
-`publicKeyRegistered: false` and `publicKeyError`, and registration still
-succeeds. A registered key cannot be replaced by a different key; the device
-must be revoked first (**409**).
+`publicKey` is required and must be base64-encoded DER `SubjectPublicKeyInfo`
+for a **P-256** key (91 bytes). An invalid key is rejected with **400** and
+nothing is stored. A revoked device cannot be re-activated by registering again.
+A registered key cannot be replaced by a different key; the device must be
+revoked first (**409**).
 
 ## Licences
 
@@ -181,8 +183,9 @@ All admin routes require `ADMIN` or `SUPER_ADMIN`.
 | GET, POST | `/admin/products` | List and create products |
 | GET, PATCH, DELETE | `/admin/products/{id}` | |
 | POST | `/admin/products/{id}/archive` | |
-| GET, POST | `/admin/products/{productId}/documents` | POST: multipart `file` (PDF, 25 MB max) and `title`. Stored encrypted at rest; status `READY` on success |
-| GET, PATCH, DELETE | `/admin/products/{productId}/documents/{id}` | PATCH `status` accepts `READY`, `DISABLED`, `DELETED`. DELETE disables |
+| GET, POST | `/admin/products/{productId}/documents` | POST: multipart `file` (PDF, 25 MB max), `title`, optional `replacesDocumentId`. Stored encrypted at rest. On success the new version is `READY` and the previous `READY` version of the same series is `DISABLED` in the same transaction. Returns **503** with no record kept if storage fails; **422** if the stored object fails verification |
+| GET, PATCH, DELETE | `/admin/products/{productId}/documents/{id}` | PATCH: `title`, and `status` of `DISABLED` or `READY` (re-enable; disables any other READY version of the series). DELETE is a tombstone: status `DELETED`, stored object removed, cannot be undone |
+| POST | `/admin/documents/{id}/retry` | Retries activation of an upload left `PROCESSING` or `FAILED` with `activation_failed`. **409** for uploads that must be repeated |
 | GET | `/admin/licenses` | |
 | GET | `/admin/licenses/{id}` | |
 | POST | `/admin/licenses/{id}/suspend` | |
@@ -194,6 +197,14 @@ All admin routes require `ADMIN` or `SUPER_ADMIN`.
 
 Prisma `DocumentStatus`: `PROCESSING`, `READY`, `DISABLED`, `DELETED`, `FAILED`.
 Only `READY` documents are visible to students and deliverable as artifacts.
+
+`failureReason` for `FAILED` documents:
+
+- `storage_write_failed`: no object exists. Upload the document again.
+- `integrity_check_failed`: the stored object does not verify. Upload again.
+- `activation_failed`: the object verified but activation did not complete. Use retry.
+
+At most one document per series can be `READY`, enforced by the database.
 
 ## Rate limits
 
