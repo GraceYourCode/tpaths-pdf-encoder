@@ -4,16 +4,22 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { productsApi, paymentApi } from "@/lib/services";
+import { errorMessage, isConflict } from "@/lib/api";
 import { formatMoney } from "@/components/StoreCard";
 import { useSession } from "@/components/SessionProvider";
-import type { Product, PaymentVerification } from "@/lib/types";
+import type { Product } from "@/lib/types";
 
 declare global {
   interface Window {
     PaystackPop?: new () => {
-      checkout: (
-        options: Record<string, unknown>,
-      ) => Promise<unknown> | unknown;
+      resumeTransaction: (
+        accessCode: string,
+        options: {
+          onSuccess?: (transaction: { reference?: string }) => void;
+          onCancel?: () => void;
+          onError?: (error: unknown) => void;
+        },
+      ) => void;
     };
   }
 }
@@ -28,12 +34,16 @@ export default function Checkout({
   const { user } = useSession();
   const router = useRouter();
   useEffect(() => {
+    let active = true;
     void params.then(({ id }) =>
       productsApi
         .get(id)
-        .then(setProduct)
-        .catch((e) => setError(e.message)),
+        .then((p) => active && setProduct(p))
+        .catch((e) => active && setError(errorMessage(e, "This product is not available."))),
     );
+    return () => {
+      active = false;
+    };
   }, [params]);
   const [paystackReady, setPaystackReady] = useState(false);
   useEffect(() => {
@@ -41,59 +51,47 @@ export default function Checkout({
     script.src = "https://js.paystack.co/v2/inline.js";
     script.async = true;
     script.onload = () => setPaystackReady(true);
-    script.onerror = () => setError("Unable to load the payment provider.");
+    script.onerror = () => setError("Unable to load the payment provider. Check your connection and refresh the page.");
     document.body.appendChild(script);
     return () => script.remove();
   }, []);
 
   async function pay() {
     if (!product || !user)
-      return router.push(`/auth/login?next=/checkout/${product?.id ?? ""}`);
-    const key = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
-    if (!key)
-      return setError(
-        "Payment configuration is missing. Set NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY.",
-      );
+      return router.push(`/auth/login?next=${encodeURIComponent(`/checkout/${product?.id ?? ""}`)}`);
     if (!paystackReady || !window.PaystackPop)
       return setError("Payment provider is still loading. Please try again.");
     setLoading(true);
     setError("");
 
     try {
-      const Paystack = window.PaystackPop;
-      const popup = new Paystack();
-      await popup.checkout({
-        key,
-        email: user.email,
-        amount: product.price,
-        currency: product.currency,
-        metadata: { productId: product.id },
-        onSuccess: (response: { reference: string }) => {
-          void paymentApi
-            .verify({
-              reference: response.reference,
-              productId: product.id,
-              amount: product.price,
-            })
-            .then((result: PaymentVerification) => {
-              sessionStorage.setItem(
-                "tpaths_last_purchase",
-                JSON.stringify(result),
-              );
-              router.push("/payment/success");
-            })
-            .catch(() => {
-              router.push(
-                `/payment/pending?reference=${encodeURIComponent(response.reference)}&productId=${encodeURIComponent(product.id)}`,
-              );
-            });
+      // The backend creates the PENDING purchase and the provider transaction, and
+      // decides the amount and reference. The browser only resumes that transaction.
+      const init = await paymentApi.initialize(product.id);
+      const popup = new window.PaystackPop();
+      const reference = init.reference;
+      const confirmUrl = `/payment/success?reference=${encodeURIComponent(reference)}&productId=${encodeURIComponent(product.id)}`;
+
+      popup.resumeTransaction(init.accessCode, {
+        onSuccess: () => {
+          // Returning from the provider is not proof of payment. The confirmation
+          // page asks the backend to verify the transaction before showing anything.
+          router.push(confirmUrl);
         },
-        onCancel: () => setError("Payment was cancelled."),
+        onCancel: () => {
+          setError("Payment was cancelled. You have not been charged.");
+          setLoading(false);
+        },
+        onError: () => {
+          setError("The payment window reported a problem. If you were charged, your purchase will appear once the backend confirms it.");
+          setLoading(false);
+        },
       });
     } catch (e) {
-        console.log(e);
       setError(
-        e instanceof Error ? e.message : "Payment could not be started.",
+        isConflict(e)
+          ? "You already own this material. Find it in your library."
+          : errorMessage(e, "Payment could not be started."),
       );
     } finally {
       setLoading(false);
@@ -121,11 +119,10 @@ export default function Checkout({
             {formatMoney(product.price, product.currency)}
           </strong>
         </div>
-        {error && <div className="alert-error mt-5">{error}</div>}
+        {error && <div role="alert" className="alert-error mt-5">{error}</div>}
         <p className="mt-5 text-sm leading-6 text-slate-600">
-          Payment is processed by the configured provider. Returning from the
-          provider does not itself prove payment succeeded; Tpaths verifies the
-          transaction with the backend before recording the purchase.
+          Payment is processed by the configured provider. Tpaths confirms the
+          transaction with the backend before showing a purchase as paid.
         </p>
         <button
           onClick={pay}

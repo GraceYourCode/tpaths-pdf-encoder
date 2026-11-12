@@ -4,6 +4,9 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/components/SessionProvider";
 import Brand from "@/components/Brand";
+import { isValidWhatsapp, normalizeWhatsapp } from "@/lib/phone";
+import { passwordProblem } from "@/lib/password";
+import { errorMessage } from "@/lib/api";
 
 export default function Register() {
   const { register } = useSession();
@@ -12,6 +15,7 @@ export default function Register() {
     firstName: "",
     lastName: "",
     email: "",
+    whatsapp: "",
     password: "",
     confirm: "",
   });
@@ -22,8 +26,15 @@ export default function Register() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    const problem = passwordProblem(form.password);
+    if (problem) return setError(problem);
     if (form.password !== form.confirm)
       return setError("Passwords do not match.");
+    const whatsapp = normalizeWhatsapp(form.whatsapp);
+    if (!isValidWhatsapp(whatsapp))
+      return setError(
+        "Enter a valid WhatsApp number with country code, for example +2348012345678.",
+      );
     setLoading(true);
 
     try {
@@ -32,17 +43,16 @@ export default function Register() {
         lastName: form.lastName.trim(),
         email: form.email.trim(),
         password: form.password,
+        whatsapp,
       });
+      // Development only: the backend returns the token outside production so testers can continue.
       if (r.verificationToken)
-        sessionStorage.setItem(
-          "tpaths_dev_verification_token",
-          r.verificationToken,
-        );
+        sessionStorage.setItem("tpaths_dev_verification_token", r.verificationToken);
       router.push(
         `/auth/verify-email?email=${encodeURIComponent(form.email.trim())}`,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to create account.");
+      setError(errorMessage(e, "Unable to create account."));
     } finally {
       setLoading(false);
     }
@@ -55,7 +65,7 @@ export default function Register() {
         <p className="mt-2 text-slate-600">
           Use the same account on the website and mobile app.
         </p>
-        {error && <div className="alert-error mt-5">{error}</div>}
+        {error && <div role="alert" className="alert-error mt-5">{error}</div>}
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="label">
             First name
@@ -85,6 +95,22 @@ export default function Register() {
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
           />
+        </label>
+        <label className="label">
+          WhatsApp number
+          <input
+            className="input"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            required
+            placeholder="+2348012345678"
+            value={form.whatsapp}
+            onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+          />
+          <span className="hint">
+            Include your country code, for example +234 for Nigeria.
+          </span>
         </label>
         <label className="label">
           Password

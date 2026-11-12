@@ -5,61 +5,68 @@ import { Alert } from "react-native";
 import { Screen } from "@/components/Screen";
 import { Brand } from "@/components/Brand";
 import { Button } from "@/components/Button";
+import { Input } from "@/components/Input";
 import { ThemedText } from "@/components/themed-text";
-import { useAuth } from "@/auth/AuthProvider";
 import { auth } from "@/api";
 
 export default function Verify() {
-  const p = useLocalSearchParams<{ email?: string }>();
-  const { user, refresh } = useAuth();
-  const [email] = useState(String(p.email ?? user?.email ?? ""));
-  const [l, setL] = useState(false);
+  const params = useLocalSearchParams<{ email?: string; token?: string }>();
+  const [email] = useState(String(params.email ?? ""));
+  const [token, setToken] = useState(String(params.token ?? ""));
+  const [busy, setBusy] = useState(false);
+  const [resending, setResending] = useState(false);
 
-  async function check() {
-    const u = await refresh();
-    if (u?.emailVerifiedAt) nav.replace("/");
-    else
-      Alert.alert(
-        "Not verified yet",
-        "Open the link in your email, then return here.",
-      );
+  async function verify() {
+    if (!token.trim()) {
+      Alert.alert("Verification token required", "Enter the token sent to your email.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await auth.verifyEmail(token.trim());
+      if (!result.verified) throw new Error("The backend did not confirm verification.");
+      Alert.alert("Email verified", "Your account is verified. You can now sign in.");
+      nav.replace("/login");
+    } catch (error) {
+      Alert.alert("Verification failed", error instanceof Error ? error.message : "Check the token and try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function resend() {
-    setL(true);
+    setResending(true);
     try {
-      await auth.resend(email);
-      Alert.alert("Email sent", "Check your inbox and spam folder.");
-    } catch (x) {
-      Alert.alert(
-        "Unable to resend",
-        x instanceof Error ? x.message : "Try again later.",
-      );
+      const result = await auth.resend(email) as { sent?: boolean; verificationToken?: string };
+      if (result.verificationToken) setToken(result.verificationToken);
+      Alert.alert("Verification requested", result.verificationToken
+        ? "A development verification token was returned and filled in."
+        : "Check your email for the verification token.");
+    } catch (error) {
+      Alert.alert("Unable to resend", error instanceof Error ? error.message : "Try again later.");
     } finally {
-      setL(false);
+      setResending(false);
     }
   }
+
   return (
     <Screen style={{ paddingTop: 50, gap: 20 }}>
       <Brand />
-      <ThemedText type="subtitle">Check your email</ThemedText>
+      <ThemedText type="subtitle">Verify your email</ThemedText>
       <ThemedText themeColor="textSecondary">
-        Verification happens on the Tpaths website. We only re-check the backend
-        state here.
+        Enter the verification token sent to your email address.
       </ThemedText>
       <ThemedText>{email}</ThemedText>
-      <Button title="I have verified my email" onPress={check} />
-      <Button
-        title="Resend verification email"
-        secondary
-        onPress={resend}
-        loading={l}
+      <Input
+        label="Verification token"
+        value={token}
+        onChangeText={setToken}
+        autoCapitalize="none"
+        autoCorrect={false}
       />
-      <Button
-        title="Back to login"
-        secondary
-        onPress={() => nav.replace("/login")}
-      />
+      <Button title="Verify account" onPress={verify} loading={busy} />
+      <Button title="Resend verification token" secondary onPress={resend} loading={resending} />
+      <Button title="Back to login" secondary onPress={() => nav.replace("/login")} />
     </Screen>
   );
 }

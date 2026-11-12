@@ -75,7 +75,7 @@ export class ProductsService {
             title: true,
             version: true,
             sizeBytes: true,
-            checksumSha256: true,
+            ...(admin ? { checksumSha256: true } : {}),
             status: true,
             createdAt: true,
           },

@@ -2,14 +2,23 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { authApi } from '@/lib/services';
-import { clearSessionTokens, getAccessToken, setAccessToken, storeRefreshToken } from '@/lib/api';
+import { clearSessionTokens, refreshAccessToken, setAccessToken } from '@/lib/api';
+import { clearActivationTokens } from '@/lib/activation-store';
 import type { User } from '@/lib/types';
+
+type RegisterBody = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  whatsapp: string;
+};
 
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
-  register: (body: { email: string; password: string; firstName: string; lastName: string }) => Promise<{ user: User; verificationToken?: string }>;
+  register: (body: RegisterBody) => Promise<{ user: User; verificationToken?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<User | null>;
 };
@@ -32,32 +41,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    // On load, re-issue an access token from the HTTP-only cookie. With no cookie
+    // the session route answers 401 without calling the backend.
+    let active = true;
     const boot = async () => {
-      const refreshToken = window.localStorage.getItem('tpaths_refresh_token');
-      if (!refreshToken && !getAccessToken()) {
-        setLoading(false);
-        return;
-      }
-      // apiFetch performs a single refresh when the access token is absent only if a request receives 401.
-      // Seed the session by explicitly refreshing through the service client.
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: refreshToken }),
-        });
-        if (!response.ok) throw new Error('refresh failed');
-        const data = await response.json() as { accessToken: string; refreshToken: string };
-        setAccessToken(data.accessToken);
-        storeRefreshToken(data.refreshToken);
-        await refreshUser();
-      } catch {
-        clearSessionTokens();
+        const token = await refreshAccessToken();
+        if (token && active) await refreshUser();
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     void boot();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
@@ -66,13 +64,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     login: async (email, password) => {
       const data = await authApi.login({ email, password });
       setAccessToken(data.accessToken);
-      storeRefreshToken(data.refreshToken);
       setUser(data.user);
       return data.user;
     },
     register: authApi.register,
     logout: async () => {
-      try { if (user) await authApi.logout(); } finally { clearSessionTokens(); setUser(null); }
+      try {
+        await authApi.logout();
+      } catch {
+        // If the request itself failed, the cookie may remain until it expires.
+        // The in-memory session is still cleared below.
+      } finally {
+        clearSessionTokens();
+        clearActivationTokens();
+        setUser(null);
+      }
     },
     refreshUser,
   }), [loading, user]);

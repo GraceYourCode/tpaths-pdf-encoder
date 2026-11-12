@@ -37,7 +37,7 @@ export class ContentService {
       where: { id: documentId },
       include: { product: true },
     });
-    if (!d || d.status !== 'ACTIVE')
+    if (!d || d.status !== DocumentStatus.READY)
       throw new NotFoundException('Document not found');
     const device = await (this.prisma as any).device.findUnique({
       where: { id: deviceId },
@@ -49,7 +49,7 @@ export class ContentService {
     });
     if (
       !l ||
-      l.product.status !== DocumentStatus.READY ||
+      l.product.status !== "ACTIVE" ||
       (l.expiresAt && l.expiresAt <= new Date()) ||
       l.deviceId !== deviceId
     )

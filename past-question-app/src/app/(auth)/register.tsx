@@ -37,6 +37,13 @@ export default function Register() {
       );
     }
 
+    if (!/^\+?[1-9]\d{7,14}$/.test(w.trim())) {
+      return Alert.alert(
+        "Invalid WhatsApp number",
+        "Enter an international number, for example +2348012345678.",
+      );
+    }
+
     if (!strong.test(p)) {
       return Alert.alert(
         "Password too weak",
@@ -54,7 +61,7 @@ export default function Register() {
     setBusy(true);
 
     try {
-      await register({
+      const verificationToken = await register({
         firstName: f,
         lastName: l,
         email: e,
@@ -64,12 +71,12 @@ export default function Register() {
 
       nav.replace({
         pathname: "/verify",
-        params: { email: e },
+        params: { email: e, ...(verificationToken ? { token: verificationToken } : {}) },
       });
-    } catch (error: Error | unknown) {
-        console.log("Registration errorssss:", (error as Error).message);
+    } catch (error) {
       Alert.alert(
         "Registration failed",
+        error instanceof Error ? error.message : "Please check your details and try again.",
       );
     } finally {
       setBusy(false);

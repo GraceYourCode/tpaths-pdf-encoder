@@ -22,7 +22,11 @@ async function refresh() {
         body: JSON.stringify({ token: s.refreshToken }),
       });
       if (!r.ok) {
-        await clearSession();
+        if (r.status === 401 || r.status === 403 || r.status === 400) {
+          await clearSession();
+          return null;
+        }
+        if (r.status >= 500) throw new ApiError(0, "The session service is temporarily unavailable.");
         return null;
       }
       const b = (await r.json()) as {
@@ -46,8 +50,9 @@ async function refresh() {
       await saveSession(d.accessToken, d.refreshToken);
       return d.accessToken;
     } catch {
-      await clearSession();
-      return null;
+      // A transient network failure must not destroy a valid refresh credential;
+      // offline document access relies on the separately bounded local lease.
+      throw new ApiError(0, "Unable to refresh the session while offline.");
     }
   })().finally(() => {
     refreshing = null;
@@ -97,7 +102,11 @@ export async function api<T>(
 
 export async function binary(path: string, contentToken: string) {
   const a = await access();
-  const h = new Headers({ "X-Content-Authorization": contentToken });
+  const h = new Headers({
+    "X-Content-Authorization": contentToken,
+    "Cache-Control": "no-store",
+    Pragma: "no-cache",
+  });
   if (a) h.set("Authorization", `Bearer ${a}`);
   let r: Response;
   try {
@@ -118,5 +127,10 @@ export async function binary(path: string, contentToken: string) {
       String(b?.error?.message ?? b?.message ?? "Document download failed"),
     );
   }
-  return { bytes: new Uint8Array(await r.arrayBuffer()), headers: r.headers };
+  const declaredLength = Number(r.headers.get("content-length") ?? 0);
+  const maxArtifactBytes = 256 * 1024 * 1024 + 245;
+  if (declaredLength > maxArtifactBytes) throw new ApiError(413, "Protected document exceeds the supported download size.");
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  if (bytes.length === 0 || bytes.length > maxArtifactBytes) throw new ApiError(413, "Protected document download is empty or too large.");
+  return { bytes, headers: r.headers };
 }

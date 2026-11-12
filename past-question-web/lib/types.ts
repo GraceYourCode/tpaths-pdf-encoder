@@ -6,6 +6,7 @@ export type User = {
   role: 'STUDENT' | 'ADMIN' | 'SUPER_ADMIN' | string;
   status: 'ACTIVE' | 'SUSPENDED' | 'PENDING' | string;
   emailVerifiedAt: string | null;
+  whatsapp?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -65,6 +66,7 @@ export type License = {
   createdAt: string;
   updatedAt: string;
   product: { id: string; title: string; status: string; documents?: DocumentSummary[] };
+  purchase?: { reference: string; createdAt: string } | null;
 };
 
 export type Device = {
@@ -82,7 +84,24 @@ export type ApiError = {
   message?: string;
 };
 
-export type PaymentVerification = Purchase & {
+/** Result of POST /payments/verify. activationToken appears only the first time a purchase completes. */
+export type PaymentVerification = {
+  id: string;
+  reference: string;
+  status: string;
+  amount: number;
+  currency: string;
+  product: { id: string; title: string };
+  license: License | null;
+  alreadyProcessed?: boolean;
   activationToken?: string;
   activationTokenExpiresAt?: string | null;
+};
+
+export type PaymentInitialization = {
+  /** Server-generated reference. The client never chooses it. */
+  reference: string;
+  authorizationUrl: string;
+  /** Passed to the Paystack browser SDK with resumeTransaction. */
+  accessCode: string;
 };
